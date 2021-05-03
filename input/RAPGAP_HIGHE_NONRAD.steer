@@ -1,0 +1,6 @@
+H1SteerTree() {
+  fHatFiles  = "/afs/desy.de/user/z/ztudesy/nfs/h1_analysis/H1_ForwardMultAnalyzer/run/hat.Rap31.LOWQ2.POSITRON.NRAD.CORR.0000.C0000001-C0000159.root";
+  fModsFiles  = "/afs/desy.de/user/z/ztudesy/nfs/h1_analysis/H1_ForwardMultAnalyzer/run/mods.Rap31.LOWQ2.POSITRON.NRAD.CORR.0000.C0000001-C0000159.root";
+
+}
+

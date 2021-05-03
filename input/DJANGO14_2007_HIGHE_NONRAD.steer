@@ -1,0 +1,5 @@
+H1SteerTree() {
+  fHatFiles  = "/nfs/dust/h1/group/sschmitt/h1_analysis/chargedForward/dst2all/hat.DJANGOH14.DIS.NC.LOWQ2.POSITRON.NRAD.RW50.CORR.0022.A00-A09.root";
+  fModsFiles  = "/nfs/dust/h1/group/sschmitt/h1_analysis/chargedForward/dst2all/mods.DJANGOH14.DIS.NC.LOWQ2.POSITRON.NRAD.RW50.CORR.0022.A00-A09.root";
+}
+

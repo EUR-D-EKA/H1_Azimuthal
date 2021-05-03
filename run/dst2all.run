@@ -1,0 +1,21 @@
+#!/bin/bash
+
+input=$1
+#input=/pnfs/desy.de/dphep/online/h1/mc/generator_files/djangoh14/5855/DJANGOH14.DIS.NC.LOWQ2.POSITRON.NRAD.RW50.CORR.0022.A00-A09
+
+base=${input##*/}
+steering=${base}.steer
+
+cat > $steering <<EOF
+OPEN BOSINPUT READ file="&
+${input}"
+* SELECT BOSINPUT RECNAME = 'RUNEVENT'
+TIMESTOP 10.0
+PRINT 3
+IOSTATISTICS
+END
+EOF
+
+hat=hat.${base}.root
+mods=mods.${base}.root
+dst2all -g transient ${mods} ${hat} < $steering

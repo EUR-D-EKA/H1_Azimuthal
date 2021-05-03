@@ -1,0 +1,7 @@
+H1SteerTree() {
+  fPath = "/pnfs/desy.de/dphep/online/h1/mc/oo-4.0/djangoh14/8927/";
+  fFileNames= "4.0.25.DJANGOH14.DIS.NC.JOINT.LOWQ2.POSITRON.RAD.W50.Q2GT2.CTEQ6L.2007p.5.8927.S39600.R97905.ftt.DST.0000-0000";
+  fLoadHAT = true;
+  fLoadMODS = true;
+}
+
