@@ -21,7 +21,7 @@ SLIB =
 LIB = 
 #
 # The binaries you would like to make, you have to provide the final linking
-BIN = ForwardMultAnalyzer
+BIN = AzimuthalAnalyzer
 
 #ifeq ($(STANDALONE),yes)
   # no rerun_rec
@@ -66,11 +66,11 @@ endif
 -include Makefile.dep
 
 # the executables
-ForwardMultAnalyzer: outputdirs $(BUILDDIR)/ForwardMultAnalyzer.o $(LIB)
+AzimuthalAnalyzer: outputdirs $(BUILDDIR)/AzimuthalAnalyzer.o $(LIB)
 	@echo ""
 	@echo Linking test program for ods access: $@ ...
 	$(LOADER) \
-        $(BUILDDIR)/ForwardMultAnalyzer.o \
+        $(BUILDDIR)/AzimuthalAnalyzer.o \
         $(OO_LIBS) \
         -lH1UserCim -lH1Clusters -lH1SubDetInfo \
         -lH1Tools -lH1Arrays -lH1Hat -lH1Mods \
@@ -83,7 +83,7 @@ ForwardMultAnalyzer: outputdirs $(BUILDDIR)/ForwardMultAnalyzer.o $(LIB)
         \
         $(ROOTLIBS) -lEG -l${FORTRANLIB} \
         -Wl,-rpath=../lib/amd64_rhel60 \
-        -o $(BINDIR)/ForwardMultAnalyzer
+        -o $(BINDIR)/AzimuthalAnalyzer
 	@echo $@ created ...
 	@echo ""
 
