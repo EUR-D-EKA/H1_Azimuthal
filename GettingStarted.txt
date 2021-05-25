@@ -1,0 +1,135 @@
+Getting started on H1.
+----------------------
+by Kong Tu, BNL
+May 25 2021
+
+Login:
+-------
+Put the following in .zshrc or similar source file
+
+#!/bin/zsh
+desygroupset h1
+source ${H1_ROOT}/etc/functions.sh
+h1lcg
+
+Storage:
+--------
+(1) home-directory:
+ /afs/desy.de/user/U/USERNAME
+ where U -> first letter of USERNAME
+ and USERNAME -> login name
+ check storage:
+  fs lq $HOME -human
+ Typical quota: 16GB
+ daily backup
+
+2) dust space
+ /nfs/dust/h1/group
+ Total quuta is about 10 TByte for the whole H1 group
+ Before using it, create a subdirectory:
+   mkdir /nfs/dust/h1/group/$USER
+ this is a raid system, without backup
+ The main purpose is to store root files and similar for the analysis
+
+
+Analysis:
+---------
+Example analysis directory
+/nfs/dust/h1/group/ztudesy/h1_analysis/H1_Azimuthal
+
+1) Copy the entire directory 
+or folk the analysis Github and git clone the dir on NFS. 
+(Version control is important for such complicated analysis)
+https://github.com/KongTu/H1_Azimuthal
+
+2) go to H1_Azimuthal/src and compile code
+make bin
+* the C++ source file is under src, AzimuthalAnalyzer.C. This is the code to be worked on.
+* elecCut.C is a code for selecting good electron
+* TDetectQedc.C is to select QED Compton event (no need to worry for now)
+
+3) go to H1_Azimuthal/run and run
+../bin/x86_64-centos7-gcc9-opt/AzimuthalAnalyzer -f ../input/highE_07_test_data.steer
+the output is a tree, which is the input to the miniTree that i generated. 
+
+4) inputs steering file under H1_Azimuthal/input
+* Take a look at data steer and MC steer. Same structure, and the directory tells you where to find data. 
+* oolumi.steer is a steering file to generate luminosity and good run numbers. To run it, go to H1_Azimuthal/run and do:
+oolumi -f ../input/oolumi.steer 
+where the output SelectedRuns.root can be used in your analysis code to only apply runs you select.
+
+5)* condor job (producing large statistics sample)
+* so my old setup is a batch system not the HT Condor, and with the system upgrade, it doesn't work out of the box. 
+HT Condor is much better and advanced. Learn how to setup from,
+https://confluence.desy.de/pages/viewpage.action?pageId=67639562
+
+* There is also an example from the example code for jet analysis see link in 4) below.
+
+
+Suggested next steps:
+---------------------
+1) Familiar with the entire framework, understand the structure of the code
+   Also, get rid of things you don't need, simply the code.
+
+2) Write a macro of making miniTree, use AzimuthalAnalyzer.root as input. 
+   in this macro, apply all event and track selections, save what you need for your offline analysis. 
+
+3) Use your own macro to reproduce the results you have
+
+3.5) at this point, try to setup HTCondor and run the full 06-07 statistics sample
+
+4) Now ready for high Q2 analysis. A few things to learn from highQ2 ANALYSIS code is:
+   (https://stash.desy.de/projects/H1ANA/repos/eventshapesmpim/browse)
+
+   * trigger selection s67
+   * high Q2 selections. 
+   * ...
+
+   * learn how they setup HTCondor with your Executable
+   * learn how to select basic events (look at Daniel's email.)
+
+
+
+Useful information:
+-------------------
+https://www-h1.desy.de/
+*h1 website has almost everything you need
+* any internal site, you need this login: 
+(login as h1intweb / FF98kals )
+
+Documentation of H1 classes:
+https://www-h1.desy.de/icas/oop/roothtml/4.0.25/ClassIndex.html
+* this is the documentation of all H1 classes. This is where you find what function to use, how to get information from the data, etc...
+For example, H1PartSelTrack, is to access the selected track (with some quality cuts already). 
+https://www-h1.desy.de/icas/oop/roothtml/4.0.25/H1PartSelTrack.html
+You can see how you get pt, eta, and other information
+
+Publications Theses are good resources to look at previous work.
+* Usually when there is something you don't know, look up something from here.
+* including physics, techniques, etc...
+
+H1 DATA
+For example,
+https://www-h1.desy.de/icas/data/DST/HERA2.html
+Summary of all data lists for HERA2 (99-2007) 
+
+H1 MC 
+find MC tool:
+https://www-h1.desy.de/imc/findmc.html
+You can find the necessary info for particular MC. 
+Just an example, If you select djangoh14, OO, 2006_e+
+the last one, with genID 6018, ReqID 8926, is the djangoh file you have used in your analysis. All info you would need is there. Very powerful tool.
+
+Download:
+---------
+scp [login_name]@naf-hone11(12).desy.de:/afs/desy.de/user/z/$USER/.. ./[local dir]
+
+
+
+
+
+
+
+
+
+
