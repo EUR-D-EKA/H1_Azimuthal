@@ -28,8 +28,11 @@ Storage:
  Total quuta is about 10 TByte for the whole H1 group
  Before using it, create a subdirectory:
    mkdir /nfs/dust/h1/group/$USER
+	cd /nfs/dust/h1/group/$USER
+	mkdir h1_analysis
  this is a raid system, without backup
  The main purpose is to store root files and similar for the analysis
+ under h1_analysis, one can have different project, see below. 
 
 
 Analysis:
