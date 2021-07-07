@@ -70,9 +70,24 @@
 #include "H1HadronicCalibration/H1HadronicCalibration.h"
 #include "H1PhysUtils/H1MakeKine.h"
 
+#include "H1Calculator/H1Calculator.h"
+#include "H1Calculator/H1CalcTrig.h"
+#include "H1Calculator/H1CalcWeight.h"
+#include "H1Calculator/H1CalcVertex.h"
+#include "H1Calculator/H1CalcEvent.h"
+#include "H1Calculator/H1CalcKine.h"
+#include "H1Calculator/H1CalcElec.h"
+#include "H1Calculator/H1CalcFs.h"
+#include "H1Calculator/H1CalcHad.h"
+#include "H1Calculator/H1CalcTrack.h"
+#include "H1Calculator/H1CalcBgTiming.h"
+#include "H1Calculator/H1CalcSystematic.h"
+
 #include "elecCut.C"
 #include "elecCut.h"
 #include "TDetectQedc.C"
+#include "FidVolCut.C"
+#include "FidVolCut.h"
 
 using namespace std;
 
@@ -325,28 +340,41 @@ int main(int argc, char* argv[]) {
    H1StdCmdLine opts;
    opts.Parse(&argc, argv);
 
-   // // open run selection and detector status file
-   // TString goodRunFileName("SelectedRuns_HighE0607_e+p_920.root");
-   // TFile goodRunFile(goodRunFileName);
-   // if(!goodRunFile.IsOpen()) {
-   //    cerr<<"Error: could not open file "<<goodRunFileName<<"\n";
-   //    return 2;
-   // }
-   // H1RunList* goodRunList
-   //    = (H1RunList*) goodRunFile.Get("H1RunList");
-   // if(!goodRunList) {
-   //    cerr<<"Error: no runlist in file - return!\n";
-   //    return 2;
-   // }
-   // H1DetectorStatus *detectorStatus
-   //    = (H1DetectorStatus*)goodRunFile.Get("MyDetectorStatus");
-   // if(!detectorStatus) {
-   //    cerr<<"Error: no detector status in file - return!\n";
-   //    return 3;
-   // }
+   // --- reconstruction method
+   // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
+
+   // open run selection and detector status file
+   TString goodRunFileName("SelectedRuns_HighE0607_e+p_920.root");
+   TFile goodRunFile(goodRunFileName);
+   if(!goodRunFile.IsOpen()) {
+      cerr<<"Error: could not open file "<<goodRunFileName<<"\n";
+      return 2;
+   }
+   H1RunList* goodRunList
+      = (H1RunList*) goodRunFile.Get("H1RunList");
+   if(!goodRunList) {
+      cerr<<"Error: no runlist in file - return!\n";
+      return 2;
+   }
+   H1DetectorStatus *detectorStatus
+      = (H1DetectorStatus*)goodRunFile.Get("MyDetectorStatus");
+   if(!detectorStatus) {
+      cerr<<"Error: no detector status in file - return!\n";
+      return 3;
+   }
+   H1ArrayF* zInfo = (H1ArrayF*)goodRunFile.Get("zInfo");
+   if(!zInfo) {
+      cerr<<"Error: no zInfo in file - return!\n";
+      return 2;
+   }
+
 
    // Load mODS/HAT files
    H1Tree::Instance()->Open();            // this statement must be there!
+
+   H1Calculator::Instance();
+   // double fLumiData = H1RunList->GetIntLumi()/1000.0;
+   H1Calculator::Instance()->Const()->SetRunList(goodRunList);
 
    TFile *file=new TFile(opts.GetOutput(), "RECREATE");
 
@@ -562,20 +590,41 @@ int main(int argc, char* argv[]) {
 
    Int_t eventCounter = 0;
 
+
+   // ------------------------------------------------------------------------ //
+   // --- The H1Calculator
+   // ------------------------------------------------------------------------ //
+   H1Calculator::Instance();
    H1HadronicCalibration *hadronicCalibration=H1HadronicCalibration::Instance();
-   hadronicCalibration->SetCalibrationMethod(H1HadronicCalibration::eIterative);
-   // hadronicCalibration->ApplyHadronicCalibration(H1HadronicCalibration::eIterative);
-   hadronicCalibration->ApplyHadronicCalibration(kTRUE);
+   hadronicCalibration->SetCalibrationMethod(H1HadronicCalibration::eHighPtJet);
+   H1Calculator::Instance()->CalibrateHadrooII();
+   H1Calculator::Instance()->CalibrateLatestHadrooII();
+   // --- HFS Settings
+   H1Calculator::Instance()->Had()->DoNotUseIron();                  // Do not include Iron in HFS sum
+   H1Calculator::Instance()->Had()->RejectTracksNearScatElec(0.2);   // exclude tracks close to the scattered electron
+
+   // --- Set Final State to NC
+   H1Calculator::Instance()->SetFinalStateToNC();
+   
+   // --- vertex settings
+   H1Calculator::Instance()->Vertex()->DoNotUseCIPForOptimalVertex();
+   H1Calculator::Instance()->Vertex()->SetTrackClusterDistance(8.0); //  03.16
+
+   // --- systematic shifts for uncertainties
+   // SetSysShift(fSys);
+
+   // --- fiducial volume cut
+   FidVolCut* fFidVolCut = new FidVolCut("FidVolCut_HERA2");
 
    // Loop over events
    static int print=10;
    while (gH1Tree->Next() && !opts.IsMaxEvent(eventCounter)) {
       ++eventCounter;
 
-         // // skip runs not in list of good runs
-         // if(!goodRunList->FindRun(*run)) continue;
-         // // skip data events with bad detector status
-         // if(!detectorStatus->IsOn()) continue;
+      // skip runs not in list of good runs
+      if(!goodRunList->FindRun(*run)) continue;
+      // skip data events with bad detector status
+      if(!detectorStatus->IsOn()) continue;
 
       double w=*weight1 * *weight2;
       if(print || ((eventCounter %10000)==0))  { 
@@ -919,11 +968,12 @@ int main(int argc, char* argv[]) {
       // define list of triggers for prescale weight calculations
       // in the HAT selection, ensure that all those subtriggers
       // are preselected
-      spacalSubtrigger.insert(0);
-      spacalSubtrigger.insert(1);
-      spacalSubtrigger.insert(2);
-      spacalSubtrigger.insert(3);
-      spacalSubtrigger.insert(61);
+      // spacalSubtrigger.insert(0);
+      // spacalSubtrigger.insert(1);
+      // spacalSubtrigger.insert(2);
+      // spacalSubtrigger.insert(3);
+      // spacalSubtrigger.insert(61);
+      spacalSubtrigger.insert(67);
 
       const Int_t *prescales=trigInfo->GetPrescales();
       const Int_t *enabled=trigInfo->GetEnabledSubTriggers();

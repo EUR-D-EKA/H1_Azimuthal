@@ -81,6 +81,13 @@ AzimuthalAnalyzer: outputdirs $(BUILDDIR)/AzimuthalAnalyzer.o $(LIB)
         -lH1Steering \
         -lH1Tracks -lH1PhysUtils  -lH1JetFinder -lH1Finder -lH1Clusters \
         \
+        -lH1Geom -lH1Ods -lH1OOBanks -lH1Tracks -lH1Clusters -lH1Mods -lH1Hat -lH1Skeleton -lH1Steering \
+        -lH1Pointers -lH1Arrays -lH1Tools -lH1Benchmarks -lH1Arrays -lH1Binning \
+        -lH1PhysUtils  -lH1JetFinder -lH1Finder -lH1HadronicCalibration -lH1CaloTrigger \
+        -lH1Calculator -lH1CalcPointers -lH1CalcWeights -lH1SoftLeptonId  -lH1Analysis \
+        -lH1MagfieldOO -lH1Cuts -lH1TrkFinder -lH1Selection -lH1ElecCalibration -lH1QCDFunc  -l${LHAPDFLIB} \
+        \
+        -L$(H1_LIBS) -L$(CERN_LIBS) \
         $(ROOTLIBS) -lEG -l${FORTRANLIB} \
         -Wl,-rpath=../lib/amd64_rhel60 \
         -o $(BINDIR)/AzimuthalAnalyzer
