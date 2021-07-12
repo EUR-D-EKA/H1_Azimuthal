@@ -38,18 +38,18 @@ FidVolCut::FidVolCut(TString name) : H1Cut()
     if(gH1SteerManager != 0) {
         gH1SteerManager->SetFilename("FidVolCut.steer");
 
-	// choose the fiducial volume cut depending on the run period
-	if (name.Contains("HERA1")) { // HERA I 
-	  cout << "Reading fiducial volume cut for period 99/00. Name = " << name.Data() << endl;
-	  gH1SteerManager->SetClassname("FidVolCut", "FidVolCut9900");
-
-	} else if (name.Contains("HERA2")) {  // HERA II
-	  cout << "Reading fiducial volume cut for period 03/07. Name = " << name.Data() << endl;
-	  gH1SteerManager->SetClassname("FidVolCut", "FidVolCut0307");
-
-	}  else {   
-	  Error("FidVolCut", "Can not initialize fiducial volume cuts for unknown period. Name is %s", name.Data());
-	}
+    	// choose the fiducial volume cut depending on the run period
+    	if (name.Contains("HERA1")) { // HERA I 
+    	  cout << "Reading fiducial volume cut for period 99/00. Name = " << name.Data() << endl;
+    	  gH1SteerManager->SetClassname("FidVolCut", "FidVolCut9900");
+    	}
+        else if (name.Contains("HERA2")) {  // HERA II
+    	  cout << "Reading fiducial volume cut for period 03/07. Name = " << name.Data() << endl;
+    	  gH1SteerManager->SetClassname("FidVolCut", "FidVolCut0307");
+    	}
+        else {
+    	   Error("FidVolCut", "Can not initialize fiducial volume cuts for unknown period. Name is %s", name.Data());
+    	}
 
         NumPeriods = gH1SteerManager->ReadInt("fNumPeriods");
 
@@ -72,7 +72,8 @@ FidVolCut::FidVolCut(TString name) : H1Cut()
         for(int i = 0 ; i < NumPeriods; ++i) fElecEStart += tempf[i];
         gH1SteerManager->ReadArray("fElecEEnd", tempf);
         for(int i = 0 ; i < NumPeriods; ++i) fElecEEnd += tempf[i];
-    } else {
+    }
+    else {
         cout << "no steer file determined" << endl;
     }
 }

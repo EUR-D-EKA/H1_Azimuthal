@@ -1,0 +1,38 @@
+H1SteerOolumi()
+{
+//#########################
+//# Run oolumi like this:
+//#########################
+//#
+//# oolumi -d -p -f lumi_0607ePlus.steer -s lumi_0607ePlus.runs -e lumi_0607ePlus.excl >&! lumi_0607ePlus.out
+//# mv SelectedRuns.root GoodRuns0304.root
+//#
+
+    fFirstRun     =  468530;   // begin of 06 e+ 
+    fLastRun      =  500611;   // end of 07e+
+
+// Excluded run ranges
+    fExcludedRunRanges = "495235,495260";//---- LAr noise E.S. scanning
+    fExcludedRuns = "480429, 480430, 480431, 480432, 481657, 482389, 482391, 483051, 483113"; // from Andrei, low NC yield
+
+
+  fMinRunLumi = 0.2;
+  fSubTrigs   = "67";
+  fPrescaleLimit = 1;
+
+// switch sub detectors on, for a list of all detectors have a
+// look at H1SteerOolumi.h
+    fCJC1 = 1;
+    fCJC2 = 1;
+    fLAR = 1;
+    fTOF = 1;
+    fLUMI = 1;
+    fCIP = 1;
+
+    fCaloTrig = 1;
+
+    fZ0 = 0.0;  //fZ0 = 2.2;
+    fDZ = 35;
+
+    fComptonCorrection = 1;
+}

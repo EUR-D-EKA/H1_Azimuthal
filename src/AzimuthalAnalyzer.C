@@ -30,6 +30,7 @@
 #include "H1Skeleton/H1EventFiller.h"
 
 // H1 OO includes
+#include "H1Analysis/H1AnalysisSteer.h"
 #include "H1Skeleton/H1Tree.h"
 #include "H1Steering/H1StdCmdLine.h"
 #include "H1Arrays/H1ArrayF.h"
@@ -506,6 +507,7 @@ int main(int argc, char* argv[]) {
    H1StdCmdLine opts;
    opts.Parse(&argc, argv);
 
+   // H1AnalysisSteer *AnaSteer = (H1AnalysisSteer*)gH1SteerManager->GetSteer( H1AnalysisSteer::Class() );
    // --- reconstruction method
    // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
 
@@ -789,6 +791,12 @@ int main(int argc, char* argv[]) {
       gH1Calc->Reset();
       gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
 
+      double w=*weight1 * *weight2;
+      if(print || ((eventCounter %10000)==0))  { 
+         cout<<eventCounter
+             <<" event "<<*run<<" "<<*evno<<" type="<<*runtype<<" weight="<<w<<"\n";
+         if(!print) print=0; //print this event
+      }
 
       // skip runs not in list of good runs
       if(!goodRunList->FindRun(*run)) continue;
@@ -797,12 +805,6 @@ int main(int argc, char* argv[]) {
 
       if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
 
-      double w=*weight1 * *weight2;
-      if(print || ((eventCounter %10000)==0))  { 
-         cout<<eventCounter
-             <<" event "<<*run<<" "<<*evno<<" type="<<*runtype<<" weight="<<w<<"\n";
-         if(!print) print=0; //print this event
-      }
       myEvent.run=*run;
       myEvent.evno=*evno;
       myEvent.w=w;
@@ -1146,7 +1148,8 @@ int main(int argc, char* argv[]) {
       // spacalSubtrigger.insert(61);
       spacalSubtrigger.insert(67);
 
-      const Int_t *prescales=trigInfo->GetPrescales();
+      // const Int_t *prescales=trigInfo->GetPrescales();
+      const Int_t prescales = 1;
       const Int_t *enabled=trigInfo->GetEnabledSubTriggers();
       for(int i=0;i<4;i++) {
          myEvent.l1l2l3ac[i]=0;
@@ -1158,13 +1161,13 @@ int main(int argc, char* argv[]) {
                myEvent.l1l2l3ac[i]|=(1<<j);
                
                if(spacalSubtrigger.find(st)!=spacalSubtrigger.end()) {
-                  prob_ac *= (1.-1./prescales[st]);
+                  prob_ac *= (1.-1./prescales);
                }
             }
             if(l1l2rw[st] && l1l3rw[st]) {
                myEvent.l1l2l3rw[i]|=(1<<j);
                if(spacalSubtrigger.find(st)!=spacalSubtrigger.end()) {
-                  prob_rw *= (1.-1./prescales[st]);
+                  prob_rw *= (1.-1./prescales);
                }
             }
          }
@@ -1264,7 +1267,8 @@ int main(int argc, char* argv[]) {
       for(int i=0;i<partCandArray.GetEntries();i++) {
          H1PartCand *cand=partCandArray[i];
          H1PartEm const *elec=cand->GetIDElec();
-         if(elec && elec->GetType()==4 ) elecCandiate.push_back( elec->GetFourVector() );//only SpaCal photons
+         // if(elec && elec->GetType()==4 ) elecCandiate.push_back( elec->GetFourVector() );//only SpaCal photons
+         if(elec && elec->GetType()==1 && fFidVolCut->FiducialVolumeCut() ) elecCandiate.push_back( elec->GetFourVector() );
          if(elec && cand->IsScatElec()) {
             if (myElecCut.goodElec(elec,*run)!=1) continue;
             H1Track const *scatElecTrk=cand->GetTrack();//to match a track

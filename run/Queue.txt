@@ -1,0 +1,3 @@
+../../input/test_0.steer test_0 out_data
+../../input/test_1.steer test_1 out_data
+../../input/test_2.steer test_2 out_data
