@@ -1,0 +1,31 @@
+1. lumi using their steering file or use .root
+2. trigger prescale?
+	//924 spacalSubtrigger.insert(67);
+	?? analysisbase.c line 234 commented out, no prescale?
+3. scattter electron cut
+	1046 delete spacal, use LAr
+	find how they select electron
+	already did electron cut in dobasicCutRec() in AnalysisBase.C line 440
+
+
+GetKineRecMethod()
+
+// --- systematic shifts for uncertainties
+   SetSysShift(fSys);      ???
+
+in FidVolCut.h line 43:
+ClassDef(FidVolCut, 1) // Cut class containing cuts on more 
+                               // complicated variables (non-generic access)
+
+in FidVolCut.C line 18:
+ClassImp(FidVolCut)
+
+why fRunType>0 in steer?
+
+H1Cut* SubTrig67 = new H1CutBool(Trig_L1ac_idx, 67);
+AddRecCut(new H1CutOr(new H1CutBool(Event_IsMC), SubTrig67), "SubTrigger S67");
+
+could not open FidVolCut.steer
+
+anaysisbase.C line 363 need to set it?
+//Default is non-radiaive MC

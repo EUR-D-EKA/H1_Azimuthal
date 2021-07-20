@@ -32,7 +32,9 @@
 // H1 OO includes
 #include "H1Analysis/H1AnalysisSteer.h"
 #include "H1Skeleton/H1Tree.h"
+#include "H1Skeleton/H1SteerTree.h"
 #include "H1Steering/H1StdCmdLine.h"
+#include "H1Steering/H1SteerManager.h"
 #include "H1Arrays/H1ArrayF.h"
 #include "H1Pointers/H1IntPtr.h"
 #include "H1Pointers/H1BytePtr.h"
@@ -49,6 +51,7 @@
 #include "H1Mods/H1PartSelTrack.h"
 #include "H1Mods/H1InclHfsIterator.h"
 #include "H1PhysUtils/H1NuclIACor.h"
+#include "H1PhysUtils/H1MCGeneratorFinder.h"
 #include "H1Mods/H1PartEmArrayPtr.h"
 
 #include "H1Geom/H1DetectorStatus.h"
@@ -348,6 +351,75 @@ bool DoBasicCutsRec(FidVolCut* fFidVolCut, float elecEnergyREC) {
    return fBasicCutsRec;
 }
 
+bool DoBasicCutsGen(const bool fNoRadMC) {
+   // (re)set return value
+   bool fBasicCutsGen = true;
+
+   //  for Django and Rapgap (radiative MC's)
+   // drop events with QEDC topology
+   if (!fNoRadMC){
+      if ( (H1Tree::Instance()->IsMC() == H1MCGeneratorFinder::kRAPGAP) ||
+           (H1Tree::Instance()->IsMC() == H1MCGeneratorFinder::kDJANGO) ){
+         static H1PartMCArrayPtr mcparts;
+         TDetectQedc QEDCFinder(mcparts);
+         fBasicCutsGen &= !QEDCFinder.IsQedcEvent();
+      }
+   }
+   
+   return fBasicCutsGen;
+}
+
+void DoBaseInitialSettings(const int runtype, double fLumiData){
+   // ------------------------------------------------------------------------ //
+   // --- read steerings
+   // ------------------------------------------------------------------------ //
+   H1SteerTree*          SteerTree     = (H1SteerTree*)        gH1SteerManager->GetSteer( H1SteerTree::Class() );
+   double fLumiMC = SteerTree->GetLumi();
+
+   //Info("AnalysisBase::InitialSettings","Reading H1AnalysisChainSteer from steering file with name: %s",ChainName);
+   H1AnalysisSteer*      AnaSteer      = (H1AnalysisSteer*)     gH1SteerManager->GetSteer( H1AnalysisSteer::Class() );
+
+   // ------------------------------------------------------------------------ //
+   // --- set run period 
+   // ------------------------------------------------------------------------ //
+   gH1Constants->SetConstants(gH1Calc->GetRunNumber()); // SetConstants takes either period or run
+   int RunPeriod = gH1Constants->GetRunPeriod();
+
+      // --- reconstruction method
+   // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
+
+   if ( runtype == 1 ) {
+      H1Calculator::Instance()->Weight()->SetDataLumi(fLumiData);
+      H1Calculator::Instance()->Weight()->SetMCLumi(fLumiMC);
+      H1Calculator::Instance()->Weight()->ApplyLumiRatio(true); // fSteer->GetApplyLumiWeight()
+      
+      // improves z vertex distribution
+      H1Calculator::Instance()->Weight()->ApplyVertexWeight(true);
+   }
+
+   // ------------------------------------------------------------------------ //
+   // --- The H1Calculator
+   // ------------------------------------------------------------------------ //
+   H1Calculator::Instance();
+   H1HadronicCalibration *hadronicCalibration=H1HadronicCalibration::Instance();
+   H1HadronicCalibration::Instance()->SetCalibrationMethod(H1HadronicCalibration::eHighPtJet);
+   H1Calculator::Instance()->CalibrateHadrooII();
+   H1Calculator::Instance()->CalibrateLatestHadrooII();
+   // --- HFS Settings
+   H1Calculator::Instance()->Had()->DoNotUseIron();                  // Do not include Iron in HFS sum
+   H1Calculator::Instance()->Had()->RejectTracksNearScatElec(0.2);   // exclude tracks close to the scattered electron
+   
+   // --- Set Final State to NC
+   H1Calculator::Instance()->SetFinalStateToNC();
+   
+   // --- vertex settings
+   H1Calculator::Instance()->Vertex()->DoNotUseCIPForOptimalVertex();
+   H1Calculator::Instance()->Vertex()->SetTrackClusterDistance(8.0); //  03.16
+
+   // --- systematic shifts for uncertainties
+   // SetSysShift(fSys);
+}
+
 struct MyEvent {
    // general information
    Int_t run,evno; // run and event number
@@ -507,10 +579,6 @@ int main(int argc, char* argv[]) {
    H1StdCmdLine opts;
    opts.Parse(&argc, argv);
 
-   // H1AnalysisSteer *AnaSteer = (H1AnalysisSteer*)gH1SteerManager->GetSteer( H1AnalysisSteer::Class() );
-   // --- reconstruction method
-   // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
-
    // open run selection and detector status file
    TString goodRunFileName("SelectedRuns.root");
    TFile goodRunFile(goodRunFileName);
@@ -536,12 +604,27 @@ int main(int argc, char* argv[]) {
       return 2;
    }
 
+   // --- read main steering
+   H1AnalysisSteer* AnaSteer = static_cast<H1AnalysisSteer*>
+      (gH1SteerManager->GetSteer( H1AnalysisSteer::Class() ));
+   if ( !AnaSteer ) {
+      Error("main","Cannot open steering. Please pass steering file with flag -f <file.steer>.");
+      exit(1);
+   }
+
+   // ------------------------------------------------------------------------ //
+   // --- read steerings
+   // ------------------------------------------------------------------------ //
+   H1SteerTree* SteerTree = (H1SteerTree*)gH1SteerManager->GetSteer( H1SteerTree::Class() );
+   if ( !SteerTree ) { Error("main","Cannot read H1SteerTree."); exit(1); }
+   SteerTree->SetLoadHAT(true);   // default settings
+   SteerTree->SetLoadMODS(true);  // default settings
 
    // Load mODS/HAT files
    H1Tree::Instance()->Open();            // this statement must be there!
 
    H1Calculator::Instance();
-   // double fLumiData = H1RunList->GetIntLumi()/1000.0;
+   double fLumiData = goodRunList->GetIntLumi()/1000.0;
    H1Calculator::Instance()->Const()->SetRunList(goodRunList);
 
    TFile *file=new TFile(opts.GetOutput(), "RECREATE");
@@ -758,44 +841,36 @@ int main(int argc, char* argv[]) {
 
    Int_t eventCounter = 0;
 
-
-   // ------------------------------------------------------------------------ //
-   // --- The H1Calculator
-   // ------------------------------------------------------------------------ //
-   H1Calculator::Instance();
-   H1HadronicCalibration *hadronicCalibration=H1HadronicCalibration::Instance();
-   hadronicCalibration->SetCalibrationMethod(H1HadronicCalibration::eHighPtJet);
-   H1Calculator::Instance()->CalibrateHadrooII();
-   H1Calculator::Instance()->CalibrateLatestHadrooII();
-   // --- HFS Settings
-   H1Calculator::Instance()->Had()->DoNotUseIron();                  // Do not include Iron in HFS sum
-   H1Calculator::Instance()->Had()->RejectTracksNearScatElec(0.2);   // exclude tracks close to the scattered electron
-
-   // --- Set Final State to NC
-   H1Calculator::Instance()->SetFinalStateToNC();
-   
-   // --- vertex settings
-   H1Calculator::Instance()->Vertex()->DoNotUseCIPForOptimalVertex();
-   H1Calculator::Instance()->Vertex()->SetTrackClusterDistance(8.0); //  03.16
-
-   // --- systematic shifts for uncertainties
-   // SetSysShift(fSys);
-
    // --- fiducial volume cut
    FidVolCut* fFidVolCut = new FidVolCut("FidVolCut_HERA2");
 
+   bool fNoRadMC         =  true;   // set to false if ISR or FSR detected
+   int Nselected = 0;
    // Loop over events
    static int print=10;
    while (gH1Tree->Next() && !opts.IsMaxEvent(eventCounter)) {
+
+      // initial settings at the begining of the loop
+      if (eventCounter == 0) {
+         DoBaseInitialSettings(*runtype, fLumiData);
+      }
+
       ++eventCounter;
+
+      //Reset all quantities at the beginning of each new event
       gH1Calc->Reset();
       gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
 
+      //If a radiated photon is detected, it is a radiative MC
+      //Default is non-radiaive MC
+      static H1FloatPtr EnPhPtr("GenEnPhoton");
+      if ( *EnPhPtr > 0 ) fNoRadMC=false;
+
       double w=*weight1 * *weight2;
-      if(print || ((eventCounter %10000)==0))  { 
+      if(eventCounter %10000==0)  { 
          cout<<eventCounter
              <<" event "<<*run<<" "<<*evno<<" type="<<*runtype<<" weight="<<w<<"\n";
-         if(!print) print=0; //print this event
+         // if(!print) print=0; //print this event
       }
 
       // skip runs not in list of good runs
@@ -803,7 +878,10 @@ int main(int argc, char* argv[]) {
       // skip data events with bad detector status
       if(!detectorStatus->IsOn()) continue;
 
+      // High Q2 cuts
+      if(*runtype==1 && !DoBasicCutsGen(fNoRadMC) ) continue;
       if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
+      Nselected++;
 
       myEvent.run=*run;
       myEvent.evno=*evno;
@@ -1089,25 +1167,25 @@ int main(int argc, char* argv[]) {
       // define initial state particle four-vectors
       double ee=*eBeamE;
       double pe= sqrt((ee+ME)*(ee-ME));
-#ifdef CORRECT_FOR_TILT
+      #ifdef CORRECT_FOR_TILT
       double pxe= - *beamtiltx0 *pe;
       double pye= - *beamtilty0 *pe;
-#else
+      #else
       double pxe= 0.;
       double pye= 0.;
-#endif
+      #endif
       double pze = - sqrt(pe*pe-pxe*pxe-pye*pye);
 
       double ep=*eBeamP;
       static double const MP=0.9382720813;
       double pp= sqrt((ep+MP)*(ep-MP));
-#ifdef CORRECT_FOR_TILT
+      #ifdef CORRECT_FOR_TILT
       double pxp= *beamtiltx0 *pp;
       double pyp= *beamtilty0 *pp;
-#else
+      #else
       double pxp= 0.;
       double pyp= 0.;
-#endif
+      #endif
       double pzp= sqrt(pp*pp-pxp*pxp-pyp*pyp);
 
       myEvent.eProtonBeam=*eBeamP;
@@ -1865,10 +1943,12 @@ int main(int argc, char* argv[]) {
    }
 
     // Summary
-    cout << "\nProcessed " << eventCounter
-        << " events\n\n";
-    cerr << "\nProcessed " << eventCounter
-       << " events\n\n";
+   cout << "\nProcessed " << eventCounter
+      << " events\n\n";
+   cout << "\nSelected " << Nselected
+      << " events\n\n";
+   cerr << "\nProcessed " << eventCounter
+      << " events\n\n";
 
     // Write histogram to file
     output->Write();

@@ -1,0 +1,7 @@
+H1SteerTree() {
+  fPath = "/pnfs/desy.de/dphep/online/h1/mc/oo-4.0/djangoh14/7014";
+  fFileNames= "4.0.6.DJ14.NC.POSI.PART2L.NOPOL.CTEQ6L.Q2G100.7014.S39200.R97700.ftt.DST.0000-0025";
+  fLoadHAT = true;
+  fLoadMODS = true;
+  fHatSelection="(fRunType>0)||(fIl1ac[67]>0)";
+}

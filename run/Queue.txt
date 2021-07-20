@@ -1,3 +1,8 @@
 ../../input/test_0.steer test_0 out_data
 ../../input/test_1.steer test_1 out_data
 ../../input/test_2.steer test_2 out_data
+../../input/test_3.steer test_3 out_data
+../../input/test_4.steer test_4 out_data
+../../input/test_5.steer test_5 out_data
+../../input/test_6.steer test_6 out_data
+../../input/test_7.steer test_7 out_data
