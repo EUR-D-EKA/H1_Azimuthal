@@ -369,15 +369,15 @@ bool DoBasicCutsGen(const bool fNoRadMC) {
    return fBasicCutsGen;
 }
 
-void DoBaseInitialSettings(const int runtype, double fLumiData){
+void DoBaseInitialSettings(const int runtype){
    // ------------------------------------------------------------------------ //
    // --- read steerings
    // ------------------------------------------------------------------------ //
-   H1SteerTree*          SteerTree     = (H1SteerTree*)        gH1SteerManager->GetSteer( H1SteerTree::Class() );
-   double fLumiMC = SteerTree->GetLumi();
+   // H1SteerTree*          SteerTree     = (H1SteerTree*)        gH1SteerManager->GetSteer( H1SteerTree::Class() );
+   // double fLumiMC = SteerTree->GetLumi();
 
    //Info("AnalysisBase::InitialSettings","Reading H1AnalysisChainSteer from steering file with name: %s",ChainName);
-   H1AnalysisSteer*      AnaSteer      = (H1AnalysisSteer*)     gH1SteerManager->GetSteer( H1AnalysisSteer::Class() );
+   // H1AnalysisSteer*      AnaSteer      = (H1AnalysisSteer*)     gH1SteerManager->GetSteer( H1AnalysisSteer::Class() );
 
    // ------------------------------------------------------------------------ //
    // --- set run period 
@@ -385,17 +385,31 @@ void DoBaseInitialSettings(const int runtype, double fLumiData){
    gH1Constants->SetConstants(gH1Calc->GetRunNumber()); // SetConstants takes either period or run
    int RunPeriod = gH1Constants->GetRunPeriod();
 
+   cout << "Run Period                          = ";
+   if      ( RunPeriod == H1Constants::eEplus9900 )  cout << "e+ 99/00" << endl; 
+   else if ( RunPeriod == H1Constants::eEplus0304 )  cout << "e+ 03/04" << endl; 
+   else if ( RunPeriod == H1Constants::eEminus0405 ) cout << "e- 04/05" << endl; 
+   else if ( RunPeriod == H1Constants::eEminus06 )   cout << "e- 06" << endl;    
+   else if ( RunPeriod == H1Constants::eEplus0607 )  cout << "e+ 06/07" << endl; 
+   else {
+      Error("AnalysisBase::InitialSettings","Unkown Run Period. Please correct the steering.");
+      exit(1);
+      cout<<RunPeriod<<endl;
+   }
+
       // --- reconstruction method
    // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
 
-   if ( runtype == 1 ) {
-      H1Calculator::Instance()->Weight()->SetDataLumi(fLumiData);
-      H1Calculator::Instance()->Weight()->SetMCLumi(fLumiMC);
-      H1Calculator::Instance()->Weight()->ApplyLumiRatio(true); // fSteer->GetApplyLumiWeight()
+
+   //reweight
+   // if ( runtype == 1 ) {
+   //    H1Calculator::Instance()->Weight()->SetDataLumi(fLumiData);
+   //    H1Calculator::Instance()->Weight()->SetMCLumi(fLumiMC);
+   //    H1Calculator::Instance()->Weight()->ApplyLumiRatio(true); // fSteer->GetApplyLumiWeight()
       
-      // improves z vertex distribution
-      H1Calculator::Instance()->Weight()->ApplyVertexWeight(true);
-   }
+   //    // improves z vertex distribution
+   //    H1Calculator::Instance()->Weight()->ApplyVertexWeight(true);
+   // }
 
    // ------------------------------------------------------------------------ //
    // --- The H1Calculator
@@ -418,6 +432,93 @@ void DoBaseInitialSettings(const int runtype, double fLumiData){
 
    // --- systematic shifts for uncertainties
    // SetSysShift(fSys);
+}
+
+void ApplyNCTrackClusterWeight(){
+   // apply the Track-Cluster Weight as determined for a cut on DCA(track,cluster) < 8 cm
+   // see HaQ meeting in June/July 2010
+   // Taken from JetReweighter.C from the jets at high Q2 analysis by Roman Kogler
+   // Calculates new event weight
+   // Data not well modeled in MC -> Electron angle theta
+   // see PhD Thesis Roman Kogler, section 9.4
+
+   
+   H1CalcEvent* Event = H1Calculator::Instance()->Event();
+      
+   static H1IntPtr RunNumber("RunNumber");
+   static Int_t OldRunNumber = 0;
+   static H1Constants* con = H1Constants::Instance();
+      
+   Float_t TrkClsWeight = 1.0;
+   TLorentzVector ScatElec = gH1Calc->Elec()->GetFirstElectron();
+   Float_t e_theta_degree = (ScatElec.Theta())*(180.0/TMath::Pi());
+   static TF1* MCVtxTrackThetaEff = new TF1("MCVtxTrackThetaEff", "[0]+[1]*x+[2]*x*x+[3]*pow(x,3)", 30, 160);
+   
+   if(OldRunNumber != *RunNumber) {
+      OldRunNumber = *RunNumber;
+        
+      if     ( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus06RH1       ){ // 06-07 e+
+         MCVtxTrackThetaEff->SetParameters(1.0356, -0.00189382, 2.43179e-05, -9.55152e-08);
+      } else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus06LH1    ){ // 06 e-
+         MCVtxTrackThetaEff->SetParameters(1.0443, -0.00160364, 1.57696e-05, -5.27797e-08);
+      } else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus04RH1    ){ // 04-05 e-
+         MCVtxTrackThetaEff->SetParameters(1.02605, -0.00147769, 1.60599e-05, -5.51945e-08);
+      } else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus03RH1     ){ // 03-04 e+
+         MCVtxTrackThetaEff->SetParameters(1.16988, -0.00611282, 6.26369e-05, -2.03377e-07);
+      } else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus9900UNPOL ){ // 99-00 e+
+         MCVtxTrackThetaEff->SetParameters(1.0, 0.0, 0.0, 0.0);
+      } else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus9899UNPOL){ // 98-99 e-
+         MCVtxTrackThetaEff->SetParameters(1.0, 0.0, 0.0, 0.0);
+      }
+
+   }
+   
+   if (e_theta_degree>30){
+      TrkClsWeight *= MCVtxTrackThetaEff->Eval(e_theta_degree);
+   }
+
+   static Int_t FirstCall = 1;
+   if(FirstCall == 1) {
+    
+      TString PeriodName    = "Unknown Period";
+      if     ( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus06RH1      ) PeriodName = "e+p 06/07";  // 06-07 e+
+      else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus06LH1     ) PeriodName = "e-p 06";  // 06 e-
+      else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus04RH1     ) PeriodName = "e-p 04/05";  // 04-05 e-
+      else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus03RH1      ) PeriodName = "e+p 03/04";  // 03-04 e+
+      else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEplus9900UNPOL  ) PeriodName = "e+p 99/00";  // 99-00 e+
+      else if( con->GetPolPeriod(*RunNumber) >= H1Constants::eEminus9899UNPOL ) PeriodName = "e-p 98/99";  // 98-99 e-
+
+      cout << "------------------------------------------------------------" << endl;
+      cout << "Apply Vertex-Track-Cluster link weight for " << PeriodName << endl;
+      cout << "TrkClsWeight: Parameters of 3rd order polynomial: " << endl;
+      for (Int_t i=0;i<4;++i) cout << "              p[" << i << "] = " << MCVtxTrackThetaEff->GetParameter(i) << endl;
+      cout << "------------------------------------------------------------" << endl;
+      FirstCall = 0;
+   }
+  
+   // apply track-cluster weight
+   Double_t OrigWeight = gH1Calc->Weight()->GetWeight();
+   //fTrackClusterWeight += TrkClsWeight;
+   //fRecWeight *= TrkClsWeight;
+   gH1Calc->Weight()->SetWeight(TrkClsWeight*OrigWeight);
+   
+}
+
+
+void DoBaseReset(bool &fNoRadMC){
+   gH1Calc->Reset();
+   gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
+
+   ApplyNCTrackClusterWeight();
+
+   gH1Calc->Reset();
+   gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
+
+   //If a radiated photon is detected, it is a radiative MC
+   //Default is non-radiaive MC
+   static H1FloatPtr EnPhPtr("GenEnPhoton");
+   if ( *EnPhPtr > 0 ) fNoRadMC=false;
+
 }
 
 struct MyEvent {
@@ -605,26 +706,26 @@ int main(int argc, char* argv[]) {
    }
 
    // --- read main steering
-   H1AnalysisSteer* AnaSteer = static_cast<H1AnalysisSteer*>
-      (gH1SteerManager->GetSteer( H1AnalysisSteer::Class() ));
-   if ( !AnaSteer ) {
-      Error("main","Cannot open steering. Please pass steering file with flag -f <file.steer>.");
-      exit(1);
-   }
+   // H1AnalysisSteer* AnaSteer = static_cast<H1AnalysisSteer*>
+   //    (gH1SteerManager->GetSteer( H1AnalysisSteer::Class() ));
+   // if ( !AnaSteer ) {
+   //    Error("main","Cannot open steering. Please pass steering file with flag -f <file.steer>.");
+   //    exit(1);
+   // }
 
    // ------------------------------------------------------------------------ //
    // --- read steerings
    // ------------------------------------------------------------------------ //
-   H1SteerTree* SteerTree = (H1SteerTree*)gH1SteerManager->GetSteer( H1SteerTree::Class() );
-   if ( !SteerTree ) { Error("main","Cannot read H1SteerTree."); exit(1); }
-   SteerTree->SetLoadHAT(true);   // default settings
-   SteerTree->SetLoadMODS(true);  // default settings
+   // H1SteerTree* SteerTree = (H1SteerTree*)gH1SteerManager->GetSteer( H1SteerTree::Class() );
+   // if ( !SteerTree ) { Error("main","Cannot read H1SteerTree."); exit(1); }
+   // SteerTree->SetLoadHAT(true);   // default settings
+   // SteerTree->SetLoadMODS(true);  // default settings
 
    // Load mODS/HAT files
    H1Tree::Instance()->Open();            // this statement must be there!
 
    H1Calculator::Instance();
-   double fLumiData = goodRunList->GetIntLumi()/1000.0;
+   // double fLumiData = goodRunList->GetIntLumi()/1000.0;
    H1Calculator::Instance()->Const()->SetRunList(goodRunList);
 
    TFile *file=new TFile(opts.GetOutput(), "RECREATE");
@@ -852,19 +953,13 @@ int main(int argc, char* argv[]) {
 
       // initial settings at the begining of the loop
       if (eventCounter == 0) {
-         DoBaseInitialSettings(*runtype, fLumiData);
+         DoBaseInitialSettings(*runtype);
       }
 
       ++eventCounter;
 
       //Reset all quantities at the beginning of each new event
-      gH1Calc->Reset();
-      gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
-
-      //If a radiated photon is detected, it is a radiative MC
-      //Default is non-radiaive MC
-      static H1FloatPtr EnPhPtr("GenEnPhoton");
-      if ( *EnPhPtr > 0 ) fNoRadMC=false;
+      DoBaseReset(fNoRadMC);
 
       double w=*weight1 * *weight2;
       if(eventCounter %10000==0)  { 

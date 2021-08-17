@@ -15,7 +15,7 @@ using std::cout;
 using std::endl;
 using std::setw;
 
-// ClassImp(FidVolCut)
+ClassImp(FidVolCut)
 
 //________________________________________________________
 //

@@ -40,7 +40,7 @@ class FidVolCut : public H1Cut
   
     private:
   
-        // ClassDef(FidVolCut, 1) // Cut class containing cuts on more 
+        ClassDef(FidVolCut, 1) // Cut class containing cuts on more 
                                // complicated variables (non-generic access)
 };
 #endif
