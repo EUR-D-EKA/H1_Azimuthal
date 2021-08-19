@@ -398,7 +398,7 @@ void DoBaseInitialSettings(const int runtype){
    }
 
       // --- reconstruction method
-   // H1Calculator::Instance()->Const()->SetKineRecMethod( AnaSteer->GetKineRecMethod() );
+   H1Calculator::Instance()->Const()->SetKineRecMethod( H1Constants::eKineRecESigma );
 
 
    //reweight
@@ -415,7 +415,7 @@ void DoBaseInitialSettings(const int runtype){
    // --- The H1Calculator
    // ------------------------------------------------------------------------ //
    H1Calculator::Instance();
-   H1HadronicCalibration *hadronicCalibration=H1HadronicCalibration::Instance();
+   // H1HadronicCalibration *hadronicCalibration=H1HadronicCalibration::Instance();
    H1HadronicCalibration::Instance()->SetCalibrationMethod(H1HadronicCalibration::eHighPtJet);
    H1Calculator::Instance()->CalibrateHadrooII();
    H1Calculator::Instance()->CalibrateLatestHadrooII();
@@ -510,9 +510,6 @@ void DoBaseReset(bool &fNoRadMC){
    gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
 
    ApplyNCTrackClusterWeight();
-
-   gH1Calc->Reset();
-   gH1Calc->Vertex()->SetPrimaryVertexType(H1CalcVertex::vtOptimalNC); // use optimal NC vertex
 
    //If a radiated photon is detected, it is a radiative MC
    //Default is non-radiaive MC
@@ -740,6 +737,7 @@ int main(int argc, char* argv[]) {
    TH1D* h_dRAllPhot = new TH1D("h_dRAllPhot",";dR",300,-16,16);
    TH1D* h_dPhiRadPhot = new TH1D("h_dPhiRadPhot",";dphi",300,-6.28,6.28);
    TH1D* h_EpzGEN = new TH1D("h_EpzGEN",";E-pz",300,0,80);
+   TH1D* h_EpzREC = new TH1D("h_EpzREC",";E-pz",300,0,80);
 
    TTree *output=new TTree("properties","properties");
    MyEvent myEvent;
@@ -1258,6 +1256,7 @@ int main(int argc, char* argv[]) {
          myEvent.maxPDGmc = maxPDG;
       }//end of MC particles
 
+      h_EpzREC->Fill(gH1Calc->Fs()->GetEmpz(),w);
 
       // define initial state particle four-vectors
       double ee=*eBeamE;
@@ -2054,6 +2053,7 @@ int main(int argc, char* argv[]) {
     h_dRAllPhot->Write();
     h_dPhiRadPhot->Write();
     h_EpzGEN->Write();
+    h_EpzREC->Write();
 
     delete file;
 
