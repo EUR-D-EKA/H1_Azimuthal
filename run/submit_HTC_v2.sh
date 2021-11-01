@@ -43,13 +43,13 @@ fi
 mkdir $JOBNAME
 
 cp run_HTC_v2.sh $JOBNAME/.
-cp Queue.txt $JOBNAME/.
+cp $QUEUEFILE $JOBNAME/.
 cp SelectedRuns.root FidVolCut.steer $JOBNAME/.
 
 # go to job directory and make CONDOR submit file:
 cd $JOBNAME
 cat <<EOF > HTC.condor
-executable               = run_HTC.sh
+executable               = run_HTC_v2.sh
 transfer_executable      = True
 universe                 = vanilla
 arguments                = \$(STEERING) \$(CHAIN) \$(OUT) ${PWD}

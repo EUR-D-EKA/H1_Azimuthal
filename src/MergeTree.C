@@ -15,6 +15,7 @@ int MergeTree(){
     list->Add(tree2);
     list->Add(tree3);
     TTree *newtree = TTree::MergeTrees(list);
-    newtree->SetName("newtree");
+
+    TFile *out = TFile::Open("out.root", "RECREATE");
     newtree->Write();
 }

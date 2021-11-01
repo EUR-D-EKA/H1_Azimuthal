@@ -123,6 +123,13 @@ TLorentzRotation BoostToHCM(TLorentzVector const &eBeam_lab,
    boost.RotateZ(-axis.Phi());
    // rotate away x-coordinate
    boost.RotateY(M_PI-axis.Theta());
+
+   TLorentzVector pBoost_escat=boost*eScat_lab;
+   TVector3 axis_escat=pBoost_escat.BoostVector();
+
+   // rotate away y-coordinate
+   boost.RotateZ(-axis_escat.Phi());
+
    return boost;
 }
 //boost to HCM frame with kinematics from e-sigma method
@@ -153,9 +160,15 @@ TLorentzRotation BoostToHCM_es(TLorentzVector const &eBeam_lab,
    TLorentzVector pBoost=boost*pBeam_lab;
    TVector3 axis=pBoost.BoostVector();
    // rotate away y-coordinate
-   boost.RotateZ(-phi_elec);
+   boost.RotateZ(-axis.Phi());
    // rotate away x-coordinate
    boost.RotateY(M_PI-axis.Theta());
+
+   TLorentzVector pBoost_escat=boost*eScat_lab;
+   TVector3 axis_escat=pBoost_escat.BoostVector();
+
+   // rotate away y-coordinate
+   boost.RotateZ(-axis_escat.Phi());
 
    return boost;
 
@@ -201,14 +214,14 @@ bool DoBasicCutsRec(FidVolCut* fFidVolCut, float elecEnergyREC) {
    //ElecCuts   &=   gH1Calc->Elec()->GetType() == 1;            // AddRecCut(new H1CutDiscreteInt(Elec_Type, 1), "Elec_Type");     // 1 for LAr, 4 for SpaCal
    //ElecCuts   &=   gH1Calc->Elec()->GetIsScatteredElectron();  // AddRecCut(new H1CutBool(Elec_IsScatteredElectron), "ScattElec");
    //ElecCuts   &=   gH1Calc->Elec()->GetFirstElectron().E() >= 0.0; //johannes change this back to 11    //8.0, tighter for DIS  // AddRecCut(new H1CutLorentz(Elec_FirstElectron, H1CutLorentz::E, 11.0, FLT_MAX), "Electron Energy");
-   ElecCuts   &=   gH1Calc->Elec()->GetFirstElectron().E() >= 11.0;  //( gH1Calc->Elec()->GetFirstElectron().E() >= 8.0 || gH1Calc->Elec()->GetElectronTrack().E() >= 5 );
+   // ElecCuts   &=   gH1Calc->Elec()->GetFirstElectron().E() >= 11.0;  //( gH1Calc->Elec()->GetFirstElectron().E() >= 8.0 || gH1Calc->Elec()->GetElectronTrack().E() >= 5 );
    ElecCuts   &=   gH1Calc->Elec()->GetFirstElectron().Theta() < 2.7; 
   
    // ---------------- HFS cuts --------------------------
    // Empz
    bool HFSCuts = true;
-   HFSCuts    &=  gH1Calc->Fs()->GetEmpz() > 45;               // cut harder than ELAN for better boost reconstruction
-   HFSCuts    &=  gH1Calc->Fs()->GetEmpz() < 65;               // AddRecCut(new H1CutFloat(Fs_Empz,       45.0, 65.0), "E-pz");  
+   // HFSCuts    &=  gH1Calc->Fs()->GetEmpz() > 45;               // cut harder than ELAN for better boost reconstruction
+   // HFSCuts    &=  gH1Calc->Fs()->GetEmpz() < 65;               // AddRecCut(new H1CutFloat(Fs_Empz,       45.0, 65.0), "E-pz");  
    
 
    // ---------------- Trigger ---------------------------
@@ -398,7 +411,7 @@ void DoBaseInitialSettings(const int runtype){
    }
 
       // --- reconstruction method
-   H1Calculator::Instance()->Const()->SetKineRecMethod( H1Constants::eKineRecESigma );
+   // H1Calculator::Instance()->Const()->SetKineRecMethod( H1Constants::eKineRecESigma );
 
 
    //reweight
@@ -559,6 +572,7 @@ struct MyEvent {
    Float_t elecEcraREC;
    Float_t xMC,yMC,Q2MC;
    Float_t xMC_es,yMC_es,Q2MC_es;
+   Float_t xMC_da,yMC_da,Q2MC_da;
 
    enum {
       nMCtrack_MAX=400
@@ -574,6 +588,8 @@ struct MyEvent {
    Float_t pyMC[nMCtrack_MAX];
    Float_t pzMC[nMCtrack_MAX];
    Float_t etaMC[nMCtrack_MAX];
+   Float_t phiMC[nMCtrack_MAX];
+   Float_t massMC[nMCtrack_MAX];
    Float_t chargeMC[nMCtrack_MAX];
 
    Float_t ptStarMC[nMCtrack_MAX];
@@ -582,6 +598,9 @@ struct MyEvent {
    Float_t ptStar2MC[nMCtrack_MAX];
    Float_t etaStar2MC[nMCtrack_MAX];
    Float_t phiStar2MC[nMCtrack_MAX];
+   Float_t ptStar3MC[nMCtrack_MAX];
+   Float_t etaStar3MC[nMCtrack_MAX];
+   Float_t phiStar3MC[nMCtrack_MAX];
 
    Float_t log10zMC[nMCtrack_MAX];
    Int_t imatchMC[nMCtrack_MAX];
@@ -590,6 +609,7 @@ struct MyEvent {
    Int_t elecChargeREC; //scattered electron alone
    Float_t elecPxREC,elecPyREC,elecPzREC,elecEREC,elecEradREC; // scattered electron + neutrals
    Float_t elecXclusREC,elecYclusREC, elecThetaREC,elecEnergyREC,elecEfracREC,elecHfracREC;
+   Float_t elecEnergyREC_H1Calc;
    Int_t elecTypeREC;
 
    Float_t radPhoPxREC,radPhoPyREC,radPhoPzREC,radPhoEREC;//radiative photon
@@ -600,7 +620,9 @@ struct MyEvent {
 
    Float_t xREC,yREC,Q2REC;
    Float_t xREC_es,yREC_es,Q2REC_es;
+   Float_t xREC_da,yREC_da,Q2REC_da;
    Float_t hfsPxREC,hfsPyREC,hfsPzREC,hfsEREC; // hadronic final state
+   Float_t EpzREC;
    enum {
       nRECtrack_MAX=200
    };
@@ -616,6 +638,7 @@ struct MyEvent {
    Float_t pREC[nRECtrack_MAX];
    Float_t peREC[nRECtrack_MAX];
    Float_t etaREC[nRECtrack_MAX];
+   Float_t phiREC[nRECtrack_MAX];
 
    Float_t ptStarREC[nRECtrack_MAX];
    Float_t etaStarREC[nRECtrack_MAX];
@@ -623,6 +646,9 @@ struct MyEvent {
    Float_t ptStar2REC[nRECtrack_MAX];
    Float_t etaStar2REC[nRECtrack_MAX];
    Float_t phiStar2REC[nRECtrack_MAX];
+   Float_t ptStar3REC[nRECtrack_MAX];
+   Float_t etaStar3REC[nRECtrack_MAX];
+   Float_t phiStar3REC[nRECtrack_MAX];
    Float_t chi2vtxREC[nRECtrack_MAX];
    Int_t   vtxNdfREC[nRECtrack_MAX];
    Int_t   vtxNHitsREC[nRECtrack_MAX];
@@ -790,6 +816,9 @@ int main(int argc, char* argv[]) {
    output->Branch("xMC_es",&myEvent.xMC_es,"xMC_es/F");
    output->Branch("yMC_es",&myEvent.yMC_es,"yMC_es/F");
    output->Branch("Q2MC_es",&myEvent.Q2MC_es,"Q2MC_es/F");
+   output->Branch("xMC_da",&myEvent.xMC_da,"xMC_da/F");
+   output->Branch("yMC_da",&myEvent.yMC_da,"yMC_da/F");
+   output->Branch("Q2MC_da",&myEvent.Q2MC_da,"Q2MC_da/F");
 
    output->Branch("nMCtrackAll",&myEvent.nMCtrackAll,"nMCtrackAll/I");
    output->Branch("nMCtrack",&myEvent.nMCtrack,"nMCtrack/I");
@@ -801,6 +830,8 @@ int main(int argc, char* argv[]) {
    output->Branch("pyMC",myEvent.pyMC,"pyMC[nMCtrack]/F");
    output->Branch("pzMC",myEvent.pzMC,"pzMC[nMCtrack]/F");
    output->Branch("etaMC",myEvent.etaMC,"etaMC[nMCtrack]/F");
+   output->Branch("phiMC",myEvent.phiMC,"phiMC[nMCtrack]/F");
+   output->Branch("massMC",myEvent.massMC,"massMC[nMCtrack]/F");
    output->Branch("chargeMC",myEvent.chargeMC,"chargeMC[nMCtrack]/F");
    output->Branch("ptStarMC",myEvent.ptStarMC,"ptStarMC[nMCtrack]/F");
    output->Branch("etaStarMC",myEvent.etaStarMC,"etaStarMC[nMCtrack]/F");
@@ -808,6 +839,9 @@ int main(int argc, char* argv[]) {
    output->Branch("ptStar2MC",myEvent.ptStar2MC,"ptStar2MC[nMCtrack]/F");
    output->Branch("etaStar2MC",myEvent.etaStar2MC,"etaStar2MC[nMCtrack]/F");
    output->Branch("phiStar2MC",myEvent.phiStar2MC,"phiStar2MC[nMCtrack]/F");
+   output->Branch("ptStar3MC",myEvent.ptStar3MC,"ptStar3MC[nMCtrack]/F");
+   output->Branch("etaStar3MC",myEvent.etaStar3MC,"etaStar3MC[nMCtrack]/F");
+   output->Branch("phiStar3MC",myEvent.phiStar3MC,"phiStar3MC[nMCtrack]/F");
    
    output->Branch("log10zMC",myEvent.log10zMC,"log10zMC[nMCtrack]/F");
    output->Branch("imatchMC",myEvent.imatchMC,"imatchMC[nMCtrack]/I");
@@ -824,6 +858,7 @@ int main(int argc, char* argv[]) {
    output->Branch("elecThetaREC",&myEvent.elecThetaREC,"elecThetaREC/F");
    output->Branch("elecTypeREC",&myEvent.elecTypeREC,"elecTypeREC/I");
    output->Branch("elecEnergyREC",&myEvent.elecEnergyREC,"elecEnergyREC/F");
+   output->Branch("elecEnergyREC_H1Calc",&myEvent.elecEnergyREC_H1Calc,"elecEnergyREC_H1Calc/F");
    output->Branch("elecEfracREC",&myEvent.elecEfracREC,"elecEfracREC/F");
    output->Branch("elecHfracREC",&myEvent.elecHfracREC,"elecHfracREC/F");
    output->Branch("clusDepositREC",&myEvent.clusDepositREC,"clusDepositREC/F");
@@ -839,10 +874,14 @@ int main(int argc, char* argv[]) {
    output->Branch("xREC_es",&myEvent.xREC_es,"xREC_es/F");
    output->Branch("yREC_es",&myEvent.yREC_es,"yREC_es/F");
    output->Branch("Q2REC_es",&myEvent.Q2REC_es,"Q2REC_es/F");
+   output->Branch("xREC_da",&myEvent.xREC_da,"xREC_da/F");
+   output->Branch("yREC_da",&myEvent.yREC_da,"yREC_da/F");
+   output->Branch("Q2REC_da",&myEvent.Q2REC_da,"Q2REC_da/F");
    output->Branch("hfsPxREC",&myEvent.hfsPxREC,"hfsPxREC/F");
    output->Branch("hfsPyREC",&myEvent.hfsPyREC,"hfsPyREC/F");
    output->Branch("hfsPzREC",&myEvent.hfsPzREC,"hfsPzREC/F");
    output->Branch("hfsEREC",&myEvent.hfsEREC,"hfsEREC/F");
+   output->Branch("EpzREC",&myEvent.EpzREC,"EpzREC/F");
 
    output->Branch("nRECtrackAll",&myEvent.nRECtrackAll,"nRECtrackAll/I");
    output->Branch("nRECtrack",&myEvent.nRECtrack,"nRECtrack/I");
@@ -854,6 +893,7 @@ int main(int argc, char* argv[]) {
    output->Branch("pREC",myEvent.pREC,"pREC[nRECtrack]/F");
    output->Branch("peREC",myEvent.peREC,"peREC[nRECtrack]/F");
    output->Branch("etaREC",myEvent.etaREC,"etaREC[nRECtrack]/F");
+   output->Branch("phiREC",myEvent.phiREC,"phiREC[nRECtrack]/F");
 
    output->Branch("ptStarREC",myEvent.ptStarREC,"ptStarREC[nRECtrack]/F");
    output->Branch("etaStarREC",myEvent.etaStarREC,"etaStarREC[nRECtrack]/F");
@@ -861,6 +901,9 @@ int main(int argc, char* argv[]) {
    output->Branch("ptStar2REC",myEvent.ptStar2REC,"ptStar2REC[nRECtrack]/F");
    output->Branch("etaStar2REC",myEvent.etaStar2REC,"etaStar2REC[nRECtrack]/F");
    output->Branch("phiStar2REC",myEvent.phiStar2REC,"phiStar2REC[nRECtrack]/F");
+   output->Branch("ptStar3REC",myEvent.ptStar3REC,"ptStar3REC[nRECtrack]/F");
+   output->Branch("etaStar3REC",myEvent.etaStar3REC,"etaStar3REC[nRECtrack]/F");
+   output->Branch("phiStar3REC",myEvent.phiStar3REC,"phiStar3REC[nRECtrack]/F");
 
    output->Branch("log10zREC",myEvent.log10zREC,"log10zREC[nRECtrack]/F");
    output->Branch("chi2vtxREC",myEvent.chi2vtxREC,"chi2vtxREC[nRECtrack]/F");
@@ -966,16 +1009,18 @@ int main(int argc, char* argv[]) {
          // if(!print) print=0; //print this event
       }
 
-      // skip runs not in list of good runs
-      if(!goodRunList->FindRun(*run)) continue;
-      // skip data events with bad detector status
-      if(!detectorStatus->IsOn()) continue;
+      if(*runtype!=1){
+         // skip runs not in list of good runs
+         if(!goodRunList->FindRun(*run)) continue;
+         // skip data events with bad detector status
+         if(!detectorStatus->IsOn()) continue;
+      }
 
       // High Q2 cuts
       if(*runtype==1 && !DoBasicCutsGen(fNoRadMC) ) continue;
       if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
       Nselected++;
-
+      myEvent.elecEnergyREC_H1Calc = gH1Calc->Elec()->GetFirstElectron().E();
       myEvent.run=*run;
       myEvent.evno=*evno;
       myEvent.w=w;
@@ -1137,6 +1182,11 @@ int main(int argc, char* argv[]) {
          myEvent.yMC_es = y_esigma;
          myEvent.xMC_es = x_esigma;
 
+         //store MC kinematics using Double Angle method
+         myEvent.Q2MC_da = gH1Calc->Kine()->GetQ2daGen();
+         myEvent.yMC_da = gH1Calc->Kine()->GetYdaGen();
+         myEvent.xMC_da = gH1Calc->Kine()->GetXdaGen();
+
          //Kinematic reconstruction - electron method
          GetKinematics(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,
                        &myEvent.xMC,&myEvent.yMC,&myEvent.Q2MC);
@@ -1144,6 +1194,7 @@ int main(int argc, char* argv[]) {
          TLorentzVector q_MC_lab(ebeam_MC_lab-escatPhot_MC_lab);
          //New boost using the e-Sigma method, scattered electrons are with radiative photon
          TLorentzRotation boost_MC_HCM_es = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,Q2_esigma,y_esigma);
+         TLorentzRotation boost_MC_HCM_da = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,myEvent.Q2MC_da,myEvent.yMC_da);
 
          // final state particles
          //bool haveElectron=false;
@@ -1186,6 +1237,7 @@ int main(int argc, char* argv[]) {
                   // boost to hadronic-centre-of-mass frame
                   TLorentzVector hStar = boost_MC_HCM*h;
                   TLorentzVector hStar2 = boost_MC_HCM_es*h;
+                  TLorentzVector hStar3 = boost_MC_HCM_da*h;
                   double etaStar=hStar.Eta();
                   double ptStar=hStar.Pt();
                   double phiStar=hStar.Phi();
@@ -1221,6 +1273,8 @@ int main(int argc, char* argv[]) {
                      myEvent.pzMC[k]=h.Z();
                      myEvent.etaMC[k]=h.Eta();
                      myEvent.chargeMC[k]=part->GetCharge();
+                     myEvent.phiMC[k] = h.Phi();
+                     myEvent.massMC[k] = h.M();
 
                      myEvent.ptStarMC[k]=hStar.Pt();
                      myEvent.etaStarMC[k]=hStar.Eta();
@@ -1229,6 +1283,10 @@ int main(int argc, char* argv[]) {
                      myEvent.ptStar2MC[k]=hStar2.Pt();
                      myEvent.etaStar2MC[k]=hStar2.Eta();
                      myEvent.phiStar2MC[k]=hStar2.Phi();
+
+                     myEvent.ptStar3MC[k]=hStar3.Pt();
+                     myEvent.etaStar3MC[k]=hStar3.Eta();
+                     myEvent.phiStar3MC[k]=hStar3.Phi();
 
                      myEvent.log10zMC[k]=log10z;
                      myEvent.imatchMC[k]=-1;
@@ -1255,8 +1313,6 @@ int main(int argc, char* argv[]) {
          }// end of MC particle loop
          myEvent.maxPDGmc = maxPDG;
       }//end of MC particles
-
-      h_EpzREC->Fill(gH1Calc->Fs()->GetEmpz(),w);
 
       // define initial state particle four-vectors
       double ee=*eBeamE;
@@ -1440,9 +1496,9 @@ int main(int argc, char* argv[]) {
          H1PartCand *cand=partCandArray[i];
          H1PartEm const *elec=cand->GetIDElec();
          // if(elec && elec->GetType()==4 ) elecCandiate.push_back( elec->GetFourVector() );//only SpaCal photons
-         if(elec && elec->GetType()==1 && fFidVolCut->FiducialVolumeCut() ) elecCandiate.push_back( elec->GetFourVector() );
+         if(elec && elec->GetType()==1) elecCandiate.push_back( elec->GetFourVector() );
          if(elec && cand->IsScatElec()) {
-            if (myElecCut.goodElec(elec,*run)!=1) continue;
+            // if (myElecCut.goodElec(elec,*run)!=1) continue;
             H1Track const *scatElecTrk=cand->GetTrack();//to match a track
             TLorentzVector p= elec->GetFourVector();
             if(p.Pt()>ptMax){
@@ -1587,8 +1643,14 @@ int main(int argc, char* argv[]) {
       myEvent.yREC_es = y_esigma_REC;
       myEvent.xREC_es = x_esigma_REC;
 
+      //store REC kinematics using Double Angle method
+      myEvent.Q2REC_da = gH1Calc->Kine()->GetQ2da();
+      myEvent.yREC_da = gH1Calc->Kine()->GetYda();
+      myEvent.xREC_da = gH1Calc->Kine()->GetXda();
+
       //New boost using the e-Sigma method
       TLorentzRotation boost_MC_HCM_esREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,Q2_esigma_REC,y_esigma_REC);
+      TLorentzRotation boost_MC_HCM_daREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,myEvent.Q2REC_da,myEvent.yREC_da);
       //end new boost
 
       for(int i=0;i<nPart;i++) {
@@ -1630,6 +1692,7 @@ int main(int argc, char* argv[]) {
                // boost to hadronic-centre-of-mass frame
                TLorentzVector hStar = boost_REC_HCM*h;
                TLorentzVector hStar2 = boost_MC_HCM_esREC*h;
+               TLorentzVector hStar3 = boost_MC_HCM_daREC*h;
                double etaStar=hStar.Eta();
                double ptStar=hStar.Pt();
                double phiStar=hStar.Phi();
@@ -1826,6 +1889,7 @@ int main(int argc, char* argv[]) {
                   myEvent.pREC[k]=track_p;
                   myEvent.peREC[k]=track_err_p;
                   myEvent.etaREC[k]=h.Eta();
+                  myEvent.phiREC[k]=h.Phi();
       
                   myEvent.ptStarREC[k]=hStar.Pt();
                   myEvent.etaStarREC[k]=hStar.Eta();
@@ -1833,6 +1897,9 @@ int main(int argc, char* argv[]) {
                   myEvent.ptStar2REC[k]=hStar2.Pt();
                   myEvent.etaStar2REC[k]=hStar2.Eta();
                   myEvent.phiStar2REC[k]=hStar2.Phi();
+                  myEvent.ptStar3REC[k]=hStar3.Pt();
+                  myEvent.etaStar3REC[k]=hStar3.Eta();
+                  myEvent.phiStar3REC[k]=hStar3.Phi();
 
                   myEvent.log10zREC[k]=log10z;
                   myEvent.chi2vtxREC[k]=chi2vtx;
@@ -2014,6 +2081,8 @@ int main(int argc, char* argv[]) {
       myEvent.hfsPyREC=hfs.Y();
       myEvent.hfsPzREC=hfs.Z();
       myEvent.hfsEREC=hfs.E();
+      myEvent.EpzREC = gH1Calc->Fs()->GetEmpz();
+      h_EpzREC->Fill(gH1Calc->Fs()->GetEmpz(),w);
 
       if(haveScatteredElectron && print) {
          cout<<"reconstructed electron w/o photons in lab: ";
@@ -2032,7 +2101,6 @@ int main(int argc, char* argv[]) {
       if(print) {
          print--;
       }
-
       output->Fill();
    }
 
