@@ -110,11 +110,19 @@ bool floatEqual(double a,double b) {
    return (d1<=1.E-5*d2);
 }
 
+TVector3 Resolution(TVector3 beta_MC, TVector3 beta_REC){
+   TVector3 b = (beta_MC - beta_REC);
+   TVector3 Res(b.X()/beta_MC.X(), b.Y()/beta_MC.Y(), b.Z()/beta_MC.Z());
+   return Res;
+}
+
 TLorentzRotation BoostToHCM(TLorentzVector const &eBeam_lab,
                             TLorentzVector const &pBeam_lab,
-                            TLorentzVector const &eScat_lab) {
+                            TLorentzVector const &eScat_lab,
+                            TVector3 &beta) {
    TLorentzVector q_lab=eBeam_lab - eScat_lab;
    TLorentzVector p_plus_q=pBeam_lab + q_lab;
+   beta = p_plus_q.BoostVector();
    // boost to HCM
    TLorentzRotation boost=TLorentzRotation(-1.0*p_plus_q.BoostVector());
    TLorentzVector pBoost=boost*pBeam_lab;
@@ -137,7 +145,8 @@ TLorentzRotation BoostToHCM_es(TLorentzVector const &eBeam_lab,
                                TLorentzVector const &pBeam_lab,
                                TLorentzVector const &eScat_lab, 
                                double Q2_es, 
-                               double y_es) {
+                               double y_es,
+                               TVector3 &beta) {
 
    double escat_lab_es_E = (Q2_es)/(4.*eBeam_lab.E()) + eBeam_lab.E()*(1.-y_es);
    double b_par = 4.*eBeam_lab.E()*eBeam_lab.E()*(1.-y_es)/(Q2_es);
@@ -154,6 +163,48 @@ TLorentzRotation BoostToHCM_es(TLorentzVector const &eBeam_lab,
    //same as before
    TLorentzVector q_lab=eBeam_lab - eScat_lab_ES;
    TLorentzVector p_plus_q=pBeam_lab + q_lab;
+   beta = p_plus_q.BoostVector();
+
+   // boost to HCM
+   TLorentzRotation boost=TLorentzRotation(-1.0*p_plus_q.BoostVector());
+   TLorentzVector pBoost=boost*pBeam_lab;
+   TVector3 axis=pBoost.BoostVector();
+   // rotate away y-coordinate
+   boost.RotateZ(-axis.Phi());
+   // rotate away x-coordinate
+   boost.RotateY(M_PI-axis.Theta());
+
+   TLorentzVector pBoost_escat=boost*eScat_lab;
+   TVector3 axis_escat=pBoost_escat.BoostVector();
+
+   // rotate away y-coordinate
+   boost.RotateZ(-axis_escat.Phi());
+
+   return boost;
+
+}
+
+//boost to HCM frame with kinematics from da/e method 
+TLorentzRotation BoostToHCM_da(TLorentzVector const &eBeam_lab,
+                               TLorentzVector const &pBeam_lab,
+                               TLorentzVector const &eScat_lab, 
+                               double Q2_da,
+                               TVector3 &beta) {
+
+   double E_da = Q2_da / (2 * eBeam_lab.E() * (1 + TMath::Cos( eScat_lab.Theta() )) );
+   // TLorentzVector eScat_lab_DA = TLorentzVector(eScat_lab);
+   // eScat_lab_DA.SetE(E_da); eScat_lab_DA.SetPhi(eScat_lab.Phi());
+   // eScat_lab_DA.SetTheta(eScat_lab.Theta());
+   double escat_lab_da_pz = sqrt(E_da*E_da - ME*ME)*TMath::Cos(eScat_lab.Theta());
+   double escat_lab_da_pt = sqrt(E_da*E_da - ME*ME - escat_lab_da_pz*escat_lab_da_pz);
+   double escat_lab_da_eta = -TMath::Log(TMath::Tan(eScat_lab.Theta()/2.));
+   TLorentzVector eScat_lab_DA;
+   eScat_lab_DA.SetPtEtaPhiE(escat_lab_da_pt, escat_lab_da_eta, eScat_lab.Phi(), E_da);
+
+   //same as before
+   TLorentzVector q_lab=eBeam_lab - eScat_lab_DA;
+   TLorentzVector p_plus_q=pBeam_lab + q_lab;
+   beta = p_plus_q.BoostVector();
 
    // boost to HCM
    TLorentzRotation boost=TLorentzRotation(-1.0*p_plus_q.BoostVector());
@@ -556,6 +607,7 @@ struct MyEvent {
    Float_t beamSpot[2];
    Float_t beamTilt[2];
    Float_t eProtonBeam,eElectronBeam;
+   Float_t boostResolution[9]; //e, es, da method resolution in x,y,z
 
    // Monte Carlo information
    Float_t eProtonBeamMC;
@@ -764,6 +816,7 @@ int main(int argc, char* argv[]) {
    TH1D* h_dPhiRadPhot = new TH1D("h_dPhiRadPhot",";dphi",300,-6.28,6.28);
    TH1D* h_EpzGEN = new TH1D("h_EpzGEN",";E-pz",300,0,80);
    TH1D* h_EpzREC = new TH1D("h_EpzREC",";E-pz",300,0,80);
+   TH1D* h_phiGEN = new TH1D("h_phiGEN",";phi",100,-3.14,3.14);
 
    TTree *output=new TTree("properties","properties");
    MyEvent myEvent;
@@ -778,6 +831,7 @@ int main(int argc, char* argv[]) {
    output->Branch("eElectronBeam",&myEvent.eElectronBeam,"eElectronBeam/F");
    output->Branch("eProtonBeamMC",&myEvent.eProtonBeamMC,"eProtonBeamMC/F");
    output->Branch("eElectronBeamMC",&myEvent.eElectronBeamMC,"eElectronBeamMC/F");
+   output->Branch("boostResolution",myEvent.boostResolution,"boostResolution[9]/F");
    
    output->Branch("l1l2l3ac",myEvent.l1l2l3ac,"l1l2l3ac[4]/i");
    output->Branch("l1l2l3rw",myEvent.l1l2l3ac,"l1l2l3rw[4]/i");
@@ -1018,13 +1072,14 @@ int main(int argc, char* argv[]) {
 
       // High Q2 cuts
       if(*runtype==1 && !DoBasicCutsGen(fNoRadMC) ) continue;
-      if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
+
       Nselected++;
       myEvent.elecEnergyREC_H1Calc = gH1Calc->Elec()->GetFirstElectron().E();
       myEvent.run=*run;
       myEvent.evno=*evno;
       myEvent.w=w;
 
+      TVector3 beta_MC_e, beta_REC_e, beta_MC_es, beta_REC_es, beta_MC_da, beta_REC_da;
       if(*runtype==1) {
          // handle MC information
          if(print) {
@@ -1190,11 +1245,11 @@ int main(int argc, char* argv[]) {
          //Kinematic reconstruction - electron method
          GetKinematics(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,
                        &myEvent.xMC,&myEvent.yMC,&myEvent.Q2MC);
-         TLorentzRotation boost_MC_HCM = BoostToHCM(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab);
+         TLorentzRotation boost_MC_HCM = BoostToHCM(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,beta_MC_e);
          TLorentzVector q_MC_lab(ebeam_MC_lab-escatPhot_MC_lab);
          //New boost using the e-Sigma method, scattered electrons are with radiative photon
-         TLorentzRotation boost_MC_HCM_es = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,Q2_esigma,y_esigma);
-         TLorentzRotation boost_MC_HCM_da = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,myEvent.Q2MC_da,myEvent.yMC_da);
+         TLorentzRotation boost_MC_HCM_es = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,Q2_esigma,y_esigma,beta_MC_es);
+         TLorentzRotation boost_MC_HCM_da = BoostToHCM_da(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,myEvent.Q2MC_da,beta_MC_da);
 
          // final state particles
          //bool haveElectron=false;
@@ -1225,6 +1280,7 @@ int main(int argc, char* argv[]) {
             
             int status=part->GetStatus();
             if(status==0||v0s_status==0) {
+            // if(status==0){
                // generator "stable" particles
                // if((!haveElectron)&&
                //    ((part->GetPDG()==11)||(part->GetPDG()== -11))) {
@@ -1274,6 +1330,7 @@ int main(int argc, char* argv[]) {
                      myEvent.etaMC[k]=h.Eta();
                      myEvent.chargeMC[k]=part->GetCharge();
                      myEvent.phiMC[k] = h.Phi();
+                     h_phiGEN->Fill(h.Phi());
                      myEvent.massMC[k] = h.M();
 
                      myEvent.ptStarMC[k]=hStar.Pt();
@@ -1313,6 +1370,9 @@ int main(int argc, char* argv[]) {
          }// end of MC particle loop
          myEvent.maxPDGmc = maxPDG;
       }//end of MC particles
+
+      //REC Cut
+      if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
 
       // define initial state particle four-vectors
       double ee=*eBeamE;
@@ -1498,7 +1558,7 @@ int main(int argc, char* argv[]) {
          // if(elec && elec->GetType()==4 ) elecCandiate.push_back( elec->GetFourVector() );//only SpaCal photons
          if(elec && elec->GetType()==1) elecCandiate.push_back( elec->GetFourVector() );
          if(elec && cand->IsScatElec()) {
-            // if (myElecCut.goodElec(elec,*run)!=1) continue;
+            if (myElecCut.goodElec(elec,*run)!=1) continue;
             H1Track const *scatElecTrk=cand->GetTrack();//to match a track
             TLorentzVector p= elec->GetFourVector();
             if(p.Pt()>ptMax){
@@ -1588,7 +1648,7 @@ int main(int argc, char* argv[]) {
       GetKinematics(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,
                     &myEvent.xREC,&myEvent.yREC,&myEvent.Q2REC);
 
-      TLorentzRotation boost_REC_HCM=BoostToHCM(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab);
+      TLorentzRotation boost_REC_HCM=BoostToHCM(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,beta_REC_e);
       TLorentzVector q_REC_lab(ebeam_REC_lab-escatPhot_REC_lab);
 
       // calculate inclusive HFS 4-vector and track selection
@@ -1649,9 +1709,11 @@ int main(int argc, char* argv[]) {
       myEvent.xREC_da = gH1Calc->Kine()->GetXda();
 
       //New boost using the e-Sigma method
-      TLorentzRotation boost_MC_HCM_esREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,Q2_esigma_REC,y_esigma_REC);
-      TLorentzRotation boost_MC_HCM_daREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,myEvent.Q2REC_da,myEvent.yREC_da);
+      TLorentzRotation boost_MC_HCM_esREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,Q2_esigma_REC,y_esigma_REC,beta_REC_es);
+      TLorentzRotation boost_MC_HCM_daREC = BoostToHCM_da(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,myEvent.Q2REC_da,beta_REC_da);
       //end new boost
+
+
 
       for(int i=0;i<nPart;i++) {
          H1PartCand *cand=0;
@@ -1963,6 +2025,14 @@ int main(int argc, char* argv[]) {
       //              myEvent.imatchREC[]  -> best matching MC particle
      
       if(*runtype==1){
+         //only MC does boost resolution
+         TVector3 Resolution_e = Resolution(beta_MC_e, beta_REC_e);
+         TVector3 Resolution_es = Resolution(beta_MC_es, beta_REC_es);
+         TVector3 Resolution_da = Resolution(beta_MC_da, beta_REC_da);
+         myEvent.boostResolution[0] = Resolution_e.X(); myEvent.boostResolution[1] = Resolution_e.Y(); myEvent.boostResolution[2] = Resolution_e.Z();
+         myEvent.boostResolution[3] = Resolution_es.X(); myEvent.boostResolution[4] = Resolution_es.Y(); myEvent.boostResolution[5] = Resolution_es.Z();
+         myEvent.boostResolution[6] = Resolution_da.X(); myEvent.boostResolution[7] = Resolution_da.Y(); myEvent.boostResolution[8] = Resolution_da.Z();
+
          //only MC does matching:
          for(int iREC=0;iREC<myEvent.nRECtrack;iREC++) {
             // skip track where momentum covariance is not known
@@ -2122,6 +2192,7 @@ int main(int argc, char* argv[]) {
     h_dPhiRadPhot->Write();
     h_EpzGEN->Write();
     h_EpzREC->Write();
+    h_phiGEN->Write();
 
     delete file;
 
