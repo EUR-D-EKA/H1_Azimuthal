@@ -816,7 +816,7 @@ int main(int argc, char* argv[]) {
    TH1D* h_dPhiRadPhot = new TH1D("h_dPhiRadPhot",";dphi",300,-6.28,6.28);
    TH1D* h_EpzGEN = new TH1D("h_EpzGEN",";E-pz",300,0,80);
    TH1D* h_EpzREC = new TH1D("h_EpzREC",";E-pz",300,0,80);
-   TH1D* h_phiGEN = new TH1D("h_phiGEN",";phi",100,-3.14,3.14);
+   TH1D* h_phiGEN = new TH1D("h_phiGEN",";phi",100,-TMath::Pi(),TMath::Pi());
 
    TTree *output=new TTree("properties","properties");
    MyEvent myEvent;
@@ -1068,6 +1068,8 @@ int main(int argc, char* argv[]) {
          if(!goodRunList->FindRun(*run)) continue;
          // skip data events with bad detector status
          if(!detectorStatus->IsOn()) continue;
+         //REC Cut
+         if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
       }
 
       // High Q2 cuts
@@ -1322,7 +1324,7 @@ int main(int argc, char* argv[]) {
                   }
                   myEvent.nMCtrackAll++;
                   if(myEvent.nMCtrack<MyEvent::nMCtrack_MAX) {
-                     int k=myEvent.nMCtrack;
+                     int k=myEvent.nMCtrack++;
                      myEvent.idMC[k]=part->GetPDG();
                      myEvent.pxMC[k]=h.X();
                      myEvent.pyMC[k]=h.Y();
@@ -1348,7 +1350,7 @@ int main(int argc, char* argv[]) {
                      myEvent.log10zMC[k]=log10z;
                      myEvent.imatchMC[k]=-1;
                      myEvent.partMC[k]=part;
-                     myEvent.nMCtrack=k+1;
+                     // myEvent.nMCtrack=k+1;
 
                      myEvent.isDaughtersMC[k] = 0;
                      //check V0s decay
@@ -1370,9 +1372,6 @@ int main(int argc, char* argv[]) {
          }// end of MC particle loop
          myEvent.maxPDGmc = maxPDG;
       }//end of MC particles
-
-      //REC Cut
-      if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
 
       // define initial state particle four-vectors
       double ee=*eBeamE;
