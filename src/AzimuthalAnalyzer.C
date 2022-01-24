@@ -250,7 +250,18 @@ void GetKinematics(TLorentzVector const &ebeam,TLorentzVector const &pbeam,
    *x= *Q2/(2.*pq);
 }
 
-bool DoBasicCutsRec(FidVolCut* fFidVolCut, float elecEnergyREC) {
+void GetKinematics_DA(TLorentzVector const &ebeam,TLorentzVector const &pbeam,
+                     TLorentzVector const &escat,double const &gamma_h,
+                     Float_t *x,Float_t *y,Float_t *Q2){
+   // *Q2 = gH1Calc->Kine()->GetQ2daGen();
+   // *y = gH1Calc->Kine()->GetYdaGen();
+   // *x = gH1Calc->Kine()->GetXdaGen();
+   *Q2 = (4*ebeam.E()*ebeam.E() *TMath::Sin(gamma_h)*(1+TMath::Cos(escat.Theta())))/(TMath::Sin(gamma_h)+TMath::Sin(escat.Theta())-TMath::Sin(escat.Theta()+gamma_h));
+   *y = (TMath::Sin(escat.Theta())*(1-TMath::Cos(gamma_h)))/(TMath::Sin(gamma_h)+TMath::Sin(escat.Theta())-TMath::Sin(escat.Theta()+gamma_h));
+   *x = ebeam.E()/pbeam.E() * (TMath::Sin(gamma_h)+TMath::Sin(escat.Theta())+TMath::Sin(escat.Theta()+gamma_h)) / (TMath::Sin(gamma_h)+TMath::Sin(escat.Theta())-TMath::Sin(escat.Theta()+gamma_h));
+}
+
+bool DoBasicCutsRec(FidVolCut* fFidVolCut) {
    //insert q2-x plot befrore rec cuts are applied
    // H2020HistManager& hm       = HistMaster::Instance()->GetHistManager("DISEvent");
    // auto betabins = H2020HistManager::MakeLogBinning(50, 0.001, 1.);
@@ -294,12 +305,12 @@ bool DoBasicCutsRec(FidVolCut* fFidVolCut, float elecEnergyREC) {
    const bool FwdRegion  = FwdTheta && CJCVtx;
    const bool OptimalVtx = gH1Calc->Vertex()->GetIsVertexFound(H1CalcVertex::vtOptimalNC);
    bool VtxCuts          =  ( OptimalVtx  || FwdRegion ); // "NCOptimalVertex"
-   VtxCuts &=  fabs(gH1Calc->Vertex()->GetZ()) < 35.0; //H1CutFloat on variable - Vertex_Z in range -35  to  35
+   // VtxCuts &=  fabs(gH1Calc->Vertex()->GetZ()) < 35.0; //H1CutFloat on variable - Vertex_Z in range -35  to  35
    
 
    // AddRecCut(new H1CutFloat(Vertex_Z, -35.0, 35.0), "Z-Vertex");
-   VtxCuts &= gH1Calc->Vertex()->GetZ() > -35.0; // "Z-Vertex"
-   VtxCuts &= gH1Calc->Vertex()->GetZ() <  35.0; // "Z-Vertex"
+   // VtxCuts &= gH1Calc->Vertex()->GetZ() > -35.0; // "Z-Vertex"
+   // VtxCuts &= gH1Calc->Vertex()->GetZ() <  35.0; // "Z-Vertex"
    
 
    // --- collect NC DIS cuts
@@ -817,6 +828,8 @@ int main(int argc, char* argv[]) {
    TH1D* h_EpzGEN = new TH1D("h_EpzGEN",";E-pz",300,0,80);
    TH1D* h_EpzREC = new TH1D("h_EpzREC",";E-pz",300,0,80);
    TH1D* h_phiGEN = new TH1D("h_phiGEN",";phi",100,-TMath::Pi(),TMath::Pi());
+   TH1D* h_Q2 = new TH1D("h_Q2",";Q2",100,-5,5);
+   TH1D* h_y = new TH1D("h_y",";y",100,-5,5);
 
    TTree *output=new TTree("properties","properties");
    MyEvent myEvent;
@@ -1039,7 +1052,6 @@ int main(int argc, char* argv[]) {
 
    // --- fiducial volume cut
    FidVolCut* fFidVolCut = new FidVolCut("FidVolCut_HERA2");
-
    bool fNoRadMC         =  true;   // set to false if ISR or FSR detected
    int Nselected = 0;
    // Loop over events
@@ -1069,7 +1081,7 @@ int main(int argc, char* argv[]) {
          // skip data events with bad detector status
          if(!detectorStatus->IsOn()) continue;
          //REC Cut
-         if(!DoBasicCutsRec(fFidVolCut,myEvent.elecEREC)) continue;
+         if(!DoBasicCutsRec(fFidVolCut)) continue;
       }
 
       // High Q2 cuts
@@ -1185,7 +1197,7 @@ int main(int argc, char* argv[]) {
             }
          }
 
-         double EpzGEN_CUT=escat0_MC_lab.E()+genPartSum.E()-escat0_MC_lab.Pz()-genPartSum.Pz();
+         double EpzGEN_CUT=escatPhot_MC_lab.E()+genPartSum.E()-escatPhot_MC_lab.Pz()-genPartSum.Pz();
          h_EpzGEN->Fill( EpzGEN_CUT );
          myEvent.isQEDbkg = 1;
          if(EpzGEN_CUT>35. && EpzGEN_CUT<70.) myEvent.isQEDbkg=0;
@@ -1208,7 +1220,9 @@ int main(int argc, char* argv[]) {
 
          //HFS 4-vectors      
          double hfs_MC_E_lab = 0.;     
-         double hfs_MC_pz_lab = 0.;    
+         double hfs_MC_pz_lab = 0.;  
+         double hfs_MC_px_lab = 0.;  
+         double hfs_MC_py_lab = 0.;  
          for(int i=0;i<mcpart.GetEntries();i++) {     
             H1PartMC *part=mcpart[i];     
             int pdgid = part->GetPDG();      
@@ -1222,11 +1236,15 @@ int main(int argc, char* argv[]) {
             if( p.DeltaR(mcpart[elec_id]->GetFourVector())<ELEC_ISOLATION_CONE ) continue;   
 
             hfs_MC_E_lab += part->GetE();    
-            hfs_MC_pz_lab += part->GetPz();     
+            hfs_MC_px_lab += part->GetPx();  
+            hfs_MC_py_lab += part->GetPy();  
+            hfs_MC_pz_lab += part->GetPz();   
          }     
 
+         double hfs_MC_pt_lab = sqrt(hfs_MC_px_lab*hfs_MC_px_lab + hfs_MC_py_lab*hfs_MC_py_lab);
          double sigma = hfs_MC_E_lab - hfs_MC_pz_lab;
- 
+         double gamma_h = 2*TMath::ATan(sigma/hfs_MC_pt_lab);
+         
          H1MakeKine makeKin_es;
          makeKin_es.MakeESig(escatPhot_MC_lab.E(), escatPhot_MC_lab.Theta(), sigma, ebeam_MC_lab.E(), pbeam_MC_lab.E());
          
@@ -1240,18 +1258,23 @@ int main(int argc, char* argv[]) {
          myEvent.xMC_es = x_esigma;
 
          //store MC kinematics using Double Angle method
-         myEvent.Q2MC_da = gH1Calc->Kine()->GetQ2daGen();
-         myEvent.yMC_da = gH1Calc->Kine()->GetYdaGen();
-         myEvent.xMC_da = gH1Calc->Kine()->GetXdaGen();
+         GetKinematics_DA(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,gamma_h,
+                          &myEvent.xMC_da,&myEvent.yMC_da,&myEvent.Q2MC_da);
 
          //Kinematic reconstruction - electron method
          GetKinematics(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,
                        &myEvent.xMC,&myEvent.yMC,&myEvent.Q2MC);
+
          TLorentzRotation boost_MC_HCM = BoostToHCM(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,beta_MC_e);
          TLorentzVector q_MC_lab(ebeam_MC_lab-escatPhot_MC_lab);
          //New boost using the e-Sigma method, scattered electrons are with radiative photon
          TLorentzRotation boost_MC_HCM_es = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,Q2_esigma,y_esigma,beta_MC_es);
          TLorentzRotation boost_MC_HCM_da = BoostToHCM_da(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,myEvent.Q2MC_da,beta_MC_da);
+         
+         if(myEvent.Q2MC>180 && myEvent.Q2MC<7000 && myEvent.yMC > 0.2 && myEvent.yMC < 0.8 && myEvent.isQEDbkg==0 && myEvent.isQEDc == 0){
+            h_Q2->Fill((myEvent.Q2MC-myEvent.Q2MC_da)/myEvent.Q2MC);
+            h_y->Fill((myEvent.yMC-myEvent.yMC_da)/myEvent.yMC);
+         }
 
          // final state particles
          //bool haveElectron=false;
@@ -1262,9 +1285,6 @@ int main(int argc, char* argv[]) {
          for(int i=0;i<mcpart.GetEntries();i++) {
             
             H1PartMC *part=mcpart[i];
-            if(print) {
-               //cout << i << " " ; part->Print();
-            }
             // skip particles counted as electron
             if(isElectron.find(i)!=isElectron.end()) continue;
 
@@ -1303,25 +1323,7 @@ int main(int argc, char* argv[]) {
                   double etaStar2=hStar2.Eta();
                   double ptStar2=hStar2.Pt();
                   double phiStar2=hStar2.Phi();
-
-                  if(print && etaStar2 < -20) {
-                     //cout << i << " " ; part->Print();
-                     cout<<"MCpart "<<myEvent.nMCtrackAll
-                         <<" "<<part->GetPDG()
-                         <<" etaLab="<<h.Eta()
-                         <<" ptLab="<<h.Pt()
-                         <<" phiLab="<<h.Phi()
-                         <<" ptStar="<<ptStar
-                         <<" etaStar="<<etaStar
-                         <<" phiStar="<<phiStar
-                         <<" ptStar2="<<ptStar2
-                         <<" etaStar2="<<etaStar2
-                         <<" phiStar2="<<phiStar2
-                         <<" Boost px "<<hStar2.Px()
-                         <<" Boost py "<<hStar2.Py()
-                         <<" Boost pz "<<hStar2.Pz()
-                         <<" log10(z)="<<log10z<<"\n";
-                  }
+                  
                   myEvent.nMCtrackAll++;
                   if(myEvent.nMCtrack<MyEvent::nMCtrack_MAX) {
                      int k=myEvent.nMCtrack++;
@@ -1350,7 +1352,6 @@ int main(int argc, char* argv[]) {
                      myEvent.log10zMC[k]=log10z;
                      myEvent.imatchMC[k]=-1;
                      myEvent.partMC[k]=part;
-                     // myEvent.nMCtrack=k+1;
 
                      myEvent.isDaughtersMC[k] = 0;
                      //check V0s decay
@@ -1690,6 +1691,7 @@ int main(int argc, char* argv[]) {
       // hfs_count.SetPtEtaPhiM(1.01*hfs_count.Pt(), hfs_count.Eta(), hfs_count.Phi(), hfs_count.M());
 
       double sigma_REC = hfs_count.E()-hfs_count.Pz();//not use for Elec method
+      double gamma_h_REC = 2*TMath::ATan(sigma_REC/hfs_count.Pt());
       
       H1MakeKine makeKin_esREC;
       makeKin_esREC.MakeESig(escatPhot_REC_lab.E(), escatPhot_REC_lab.Theta(), sigma_REC, ebeam_REC_lab.E(), pbeam_REC_lab.E());
@@ -1703,9 +1705,8 @@ int main(int argc, char* argv[]) {
       myEvent.xREC_es = x_esigma_REC;
 
       //store REC kinematics using Double Angle method
-      myEvent.Q2REC_da = gH1Calc->Kine()->GetQ2da();
-      myEvent.yREC_da = gH1Calc->Kine()->GetYda();
-      myEvent.xREC_da = gH1Calc->Kine()->GetXda();
+      GetKinematics_DA(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,gamma_h_REC,
+                        &myEvent.xREC_da,&myEvent.yREC_da,&myEvent.Q2REC_da);
 
       //New boost using the e-Sigma method
       TLorentzRotation boost_MC_HCM_esREC = BoostToHCM_es(ebeam_REC_lab,pbeam_REC_lab,escatPhot_REC_lab,Q2_esigma_REC,y_esigma_REC,beta_REC_es);
@@ -2192,6 +2193,8 @@ int main(int argc, char* argv[]) {
     h_EpzGEN->Write();
     h_EpzREC->Write();
     h_phiGEN->Write();
+    h_Q2->Write();
+    h_y->Write();
 
     delete file;
 
