@@ -467,8 +467,8 @@ void DoBaseInitialSettings(const int runtype){
    else if ( RunPeriod == H1Constants::eEminus06 )   cout << "e- 06" << endl;    
    else if ( RunPeriod == H1Constants::eEplus0607 )  cout << "e+ 06/07" << endl; 
    else {
-      Error("AnalysisBase::InitialSettings","Unkown Run Period. Please correct the steering.");
-      exit(1);
+      // Error("AnalysisBase::InitialSettings","Unkown Run Period. Please correct the steering.");
+      // exit(1);
       cout<<RunPeriod<<endl;
    }
 
@@ -828,8 +828,9 @@ int main(int argc, char* argv[]) {
    TH1D* h_EpzGEN = new TH1D("h_EpzGEN",";E-pz",300,0,80);
    TH1D* h_EpzREC = new TH1D("h_EpzREC",";E-pz",300,0,80);
    TH1D* h_phiGEN = new TH1D("h_phiGEN",";phi",100,-TMath::Pi(),TMath::Pi());
-   TH1D* h_Q2 = new TH1D("h_Q2",";Q2",100,-5,5);
-   TH1D* h_y = new TH1D("h_y",";y",100,-5,5);
+   TH1D* h_Q2 = new TH1D("h_Q2",";Res(Q2)",100,-4,4);
+   TH1D* h_y = new TH1D("h_y",";Res(y)",100,-4,4);
+   TH1D* h_hfsTheta = new TH1D("h_hfsTheta",";Theta",100,-4,4);
 
    TTree *output=new TTree("properties","properties");
    MyEvent myEvent;
@@ -1172,7 +1173,7 @@ int main(int argc, char* argv[]) {
             //check isQEDbkg
             if( (status==0||status==202) && i!=mcPartId.GetIdxScatElectron() ){
                TLorentzVector genpart = part->GetFourVector();
-               if(genpart.Theta()*TMath::RadToDeg() > 177.5 || genpart.Theta()*TMath::RadToDeg() < 15.0 ) continue;
+               if(genpart.Theta()*TMath::RadToDeg() > 174 || genpart.Theta()*TMath::RadToDeg() < 4 ) continue;
                genPartSum += genpart;
             }
             //fsr
@@ -1271,9 +1272,9 @@ int main(int argc, char* argv[]) {
          TLorentzRotation boost_MC_HCM_es = BoostToHCM_es(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,Q2_esigma,y_esigma,beta_MC_es);
          TLorentzRotation boost_MC_HCM_da = BoostToHCM_da(ebeam_MC_lab,pbeam_MC_lab,escatPhot_MC_lab,myEvent.Q2MC_da,beta_MC_da);
          
-         if(myEvent.Q2MC>180 && myEvent.Q2MC<7000 && myEvent.yMC > 0.2 && myEvent.yMC < 0.8 && myEvent.isQEDbkg==0 && myEvent.isQEDc == 0){
-            h_Q2->Fill((myEvent.Q2MC-myEvent.Q2MC_da)/myEvent.Q2MC);
-            h_y->Fill((myEvent.yMC-myEvent.yMC_da)/myEvent.yMC);
+         if(myEvent.Q2GKI>180 && myEvent.Q2GKI<7000 && myEvent.yGKI > 0.2 && myEvent.yGKI < 0.8 && myEvent.isQEDbkg==0 && myEvent.isQEDc == 0){
+            h_Q2->Fill((myEvent.Q2GKI-myEvent.Q2MC_da)/myEvent.Q2GKI);
+            h_y->Fill((myEvent.yGKI-myEvent.yMC_da)/myEvent.yGKI);
          }
 
          // final state particles
@@ -1311,6 +1312,8 @@ int main(int argc, char* argv[]) {
                if(part->GetCharge()!=0.) {
                   // other charged particles
                   TLorentzVector h=part->GetFourVector();
+                  if( h.Theta() *TMath::RadToDeg() < 4 or h.Theta() *TMath::RadToDeg() > 174 ) continue;
+                  h_hfsTheta->Fill(h.Theta());
                   double log10z=TMath::Log10((h*pbeam_MC_lab)/(q_MC_lab*pbeam_MC_lab));
                   // boost to hadronic-centre-of-mass frame
                   TLorentzVector hStar = boost_MC_HCM*h;
@@ -1750,6 +1753,8 @@ int main(int argc, char* argv[]) {
             if(haveScatteredElectron) {
                TLorentzVector h=p;
                if(track) h=track->GetFourVector();
+               if(h.Theta()*TMath::RadToDeg() > 174 || h.Theta()*TMath::RadToDeg() < 4 ) continue;
+
                double log10z=TMath::Log10((h*pbeam_REC_lab)/(q_REC_lab*pbeam_REC_lab));
                // boost to hadronic-centre-of-mass frame
                TLorentzVector hStar = boost_REC_HCM*h;
@@ -2195,6 +2200,7 @@ int main(int argc, char* argv[]) {
     h_phiGEN->Write();
     h_Q2->Write();
     h_y->Write();
+    h_hfsTheta->Write();
 
     delete file;
 
